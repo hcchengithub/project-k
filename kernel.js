@@ -346,7 +346,7 @@ function Kvm() {
 			"this.vid='forth'",
 			"this.wid=1",
 			"this.type='code'",
-			"this.help=this.name+' ( <name> -- ) Start composing a code word.'",
+			"this.help='( <name> -- ) Start composing a code word.'",
 			"this.selftest='pass'"
 		]),
 		new Word([
@@ -366,7 +366,7 @@ function Kvm() {
 			"this.type='code'",
 			"this.immediate=true",
 			"this.compileonly=true",
-			"this.help=this.name+' ( -- ) Wrap up the new code word.'"
+			"this.help='( -- ) Wrap up the new code word.'"
 		])
 	];
 	

@@ -40,7 +40,7 @@
 		);
 
 		function forthConsoleHandler(cmd) {
-			printStr((cmd?'\n':"")+cmd+'\n');
+            printStr((cmd?'\n> ':"")+cmd+'\n');
 			kvm.fortheval(cmd);  // Pass the command line to KsanaVM
 			printStr(" " + kvm.prompt + " ");
 			jump2endofinputbox.click(); inputbox.focus();
