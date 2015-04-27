@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title class=appname>project-k baby</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" type="text/css" href="common.css">
+    <style id=styleTextareaFocus type="text/css">
+            textarea:focus {
+                background:#E0E0E0;
+            }
+    </style>
+    <script src="jquery-1.11.2.js"></script>
+    <Script src="kernel.js"></Script>
+    <script id=js>
+    (function(){
+        // I/O
+        var printStr = kvm.printStr = function (s) {
+            try {
+                var ss = s + ''; // Print-able test
+            } catch(err) {
+                ss = Object.prototype.toString.apply(s);
+            }
+            $('#outputbox').append(plain(ss));
+        };
+        kvm.prompt = "OK";
+
+        function clearScreen(){
+            outputbox.innerHTML="";
+        }
+        kvm.clearScreen = clearScreen;
+
+        // System initialization
+        jQuery(document).ready(
+            function() {
+                // $("#kernelf").hide();
+                document.onkeydown = hotKeyHandler; // Must be using onkeydown so as to grab the control.
+                kvm.init();
+                kvm.fortheval(kernelfsource.value);
+            }
+        );
+
+        function forthConsoleHandler(cmd) {
+            printStr((cmd?'\n':"")+cmd+'\n');
+            kvm.fortheval(cmd);  // Pass the command line to KsanaVM
+            printStr(" " + kvm.prompt + " ");
+            jump2endofinputbox.click(); inputbox.focus();
+        }
+
+        // onkeydown,onkeypress,onkeyup
+        // event.shiftKey event.ctrlKey event.altKey event.metaKey
+        // KeyCode test page http://www.asquare.net/javascript/tests/KeyCode.html
+        function hotKeyHandler(e) {
+            switch(e.keyCode) {
+                case 13: /* Enter */
+                    if(event.ctrlKey) {
+                        kvm.inputbox = inputbox.value; // w/o the '\n' character ($10).
+                        inputbox.value = ""; // 少了這行，如果壓下 Enter 不放，就會變成重複執行。
+                        forthConsoleHandler(kvm.inputbox);
+                        return(false);
+                    }
+            }
+            return (true); // pass down to following handlers
+        }
+
+        var plain = kvm.plain = function (s) {
+            var ss = s + ""; // avoid numbers to fail at s.replace()
+            ss = ss.replace(/\t/g,' &nbsp; &nbsp;');
+            ss = ss.replace(/ /g,'&nbsp;');
+            ss = ss.replace(/</g,'&lt;');
+            ss = ss.replace(/>/g,'&gt;');
+            ss = ss.replace(/\n/g,'<br>');
+            return ss;
+        }
+    })();
+    </script>
+</head>
+<body>
+    <div><b>Forth kernel evaluation -- baby.html FigTaiwan 2015</b></div><hr><i>Output area, 'cls' command to clear</i>
+    <div id="outputbox"><div id="kernelf">kernel.f<textarea id="kernelfsource" cols=100 rows=10>
+code //     var s = nexttoken('\n|\r'); last().help = s; end-code 
+            // ( <comment> -- ) Give help message to the last word.
+code cls    kvm.clearScreen() end-code // ( -- ) Clear output area
+code words  for(var i=1; i<words.forth.length; i++) printStr(words.forth[i].name+" ") end-code 
+            // ( -- ) List all words
+code help   for(var i=1; i<words.forth.length; i++) 
+            printStr(words.forth[i].name+" "+words.forth[i]+'\n') 
+            end-code // ( -- ) List all words' help message
+code hide   $("#kernelf").hide() end-code // ( -- ) Hide the kernel.f textarea
+code show   $("#kernelf").show() end-code // ( -- ) Show the kernel.f textarea
+    </textarea></div></div><hr>
+    <div><i>Input box -- Ctrl-Enter to execute</i><textarea id="inputbox" cols=100 rows=4></textarea><a id=jump2endofinputbox href="#endofinputbox"></a><div id=endofinputbox></div></div>
+</body>
+</html>
+
