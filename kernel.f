@@ -290,7 +290,7 @@ code \s         ( -- ) \ Stop outer loop which may be loading forth source files
 				<selftest>
 					\ depth [if] .( Data stack should be empty! ) cr \s [then]
 					\ *** \s should ignore the remaining TIB ...
-					\ 	<js> fortheval("123 \\s 324 32  ... ignore every thing !!!!"); </jsN>
+					\ 	<js> dictate("123 \\s 324 32  ... ignore every thing !!!!"); </jsN>
 					\ 	depth + 124 = ==>judge drop
 				</selftest>
 
@@ -955,7 +955,7 @@ code literal 	( n -- ) \ Compile TOS as an anonymous constant
 				end-code
 code alias      ( Word <alias> -- ) \ Create a new name for an existing word
 				var w = pop();
-				// To use the correct TIB, must use execute("word") instead of fortheval("word").
+				// To use the correct TIB, must use execute("word") instead of dictate("word").
 				execute("BL"); execute("word"); execute("(create)");execute("reveal");
                 // mergeObj(last(), w); // copy everything by value from the predecessor includes arrays and objects.
 				for(var i in w) last()[i] = w[i]; // copy from predecessor but arrays and objects are by reference
@@ -1603,17 +1603,17 @@ code ASCII>char ( ASCII -- 'c' ) \ number to character
 				/// See alternative method for command line by 'cut' and 'rewind'.
 
 : </task>		( "task" -- ... ) \ Delimiter of <task>
-				compiling if literal js: push(function(){fortheval(pop())}) , 
-				else js: fortheval(pop()) then ; immediate
+				compiling if literal js: push(function(){dictate(pop())}) , 
+				else js: dictate(pop()) then ; immediate
 				/// See alternative method for command line by 'cut' and 'rewind'.
 
 code .s         ( ... -- ... ) \ Dump the data stack.
 				var count=stack.length, basewas=kvm.base;
                 if(count>0) for(var i=0;i<count;i++){
 					if (typeof(stack[i])=="number") {
-						push(stack[i]); push(i); fortheval("decimal 7 .r char : . space dup decimal 11 .r space hex 11 .r char h .");
+						push(stack[i]); push(i); dictate("decimal 7 .r char : . space dup decimal 11 .r space hex 11 .r char h .");
 					} else {
-						push(stack[i]); push(i); fortheval("decimal 7 .r char : . space .");
+						push(stack[i]); push(i); dictate("decimal 7 .r char : . space .");
 					}
 					print(" ("+mytypeof(stack[i])+")\n");
                 } else print("empty\n");
@@ -1769,13 +1769,13 @@ code writeTextFile ( string "pathname" -- ) \ Write string to file. Panic if fai
 
 \ code tib.append	( "string" -- ) \ Append the "string" to TIB
 \ 				tib += " " + (pop()||""); end-code
-\ 				/// KVM suspend-resume doesn't allow multiple levels of fortheval() so
+\ 				/// KVM suspend-resume doesn't allow multiple levels of dictate() so
 \ 				/// we need tib.append or tib.insert.
 
 code tib.append	( "string" -- ) \ Append the "string" to TIB
 				tib = tib.slice(ntib); ntib = 0;
 				tib += " " + (pop()||""); end-code
-				/// KVM suspend-resume doesn't allow multiple levels of fortheval() so
+				/// KVM suspend-resume doesn't allow multiple levels of dictate() so
 				/// we need tib.append or tib.insert.
 
 				<comment>
@@ -1790,13 +1790,13 @@ code tib.append	( "string" -- ) \ Append the "string" to TIB
 \ code tib.insert	( "string" -- ) \ Insert the "string" into TIB
 \ 				var before = tib.slice(0,ntib), after = tib.slice(ntib);
 \ 				tib = before + " " + (pop()||"") + " " + after; end-code
-\ 				/// KVM suspend-resume doesn't allow multiple levels of fortheval() so
+\ 				/// KVM suspend-resume doesn't allow multiple levels of dictate() so
 \ 				/// we need tib.append or tib.insert.
 
 code tib.insert	( "string" -- ) \ Insert the "string" into TIB
 				tib = tib.slice(ntib); ntib = 0;
 				tib = (pop()||"") + " " + tib; end-code
-				/// KVM suspend-resume doesn't allow multiple levels of fortheval() so
+				/// KVM suspend-resume doesn't allow multiple levels of dictate() so
 				/// we need tib.append or tib.insert.
 
 : sinclude.js	( "pathname" -- ) \ Include JavaScript source file
@@ -1889,7 +1889,7 @@ code (see)      ( thing -- ) \ See into the given word, object, array, ... anyth
                     for(var i in w){
                         if (typeof(w[i])=="function") continue;
                         if (i=="comment") continue;
-                        push(i); fortheval("16 .r s'  : ' .");
+                        push(i); dictate("16 .r s'  : ' .");
                         print(w[i]+" ("+mytypeof(w[i])+")\n");
                     }
                     if (w.type.indexOf("colon")!=-1){
@@ -1903,7 +1903,7 @@ code (see)      ( thing -- ) \ See into the given word, object, array, ... anyth
                         for(var i in w){
                             if (typeof(w[i])!="function") continue;
                             // if (i=="selfTest") continue;
-                            push(i); fortheval("16 .r s'  :\n' .");
+                            push(i); dictate("16 .r s'  :\n' .");
                             print(w[i]+"\n");
                         }
                     }

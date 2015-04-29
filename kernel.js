@@ -84,7 +84,7 @@ function Kvm() {
 		}
 		if(severe) // switch to JavaScript console, if available, for severe issues.
 			if(tick("jsc")) {
-				fortheval("jsc");
+				dictate("jsc");
 			}
 	}
 
@@ -178,9 +178,9 @@ function Kvm() {
 	// execute() 類似 CPU instruction 的 single step, 而 inner() 類似 CPU 的 call 指令。
 	// 會用 到 inner() 的有 outer() 以及 colon word 的 xt(), 而 execute() 則到處有用。 
 	
-	// 從 code word 裡 call forth word 的方法有 execute('word') 與 fortheval('word word word')
-	// 加上 inner(cfa) 三種方法可供選擇。fortheval() 暫時岔開一層 outer loop, 於其中
-	// 只看到臨時的 TIB 也就是 fortheval() 的 input string。
+	// 從 code word 裡 call forth word 的方法有 execute('word') 與 dictate('word word word')
+	// 加上 inner(cfa) 三種方法可供選擇。dictate() 暫時岔開一層 outer loop, 於其中
+	// 只看到臨時的 TIB 也就是 dictate() 的 input string。
 
 	// 最終極的 inner loop 是由 while(w){ip++; w.xt(); w=dictionary[ip]}; 以及 return 時的
 	// ip=rstack.pop(); 組成。只要用具有 false 邏輯屬性的東西來當 ret 以及 exit 就可以滿足。
@@ -378,7 +378,7 @@ function Kvm() {
 	// Recursively evaluate the input. 
 	// The input can be multiple lines or an entire ~.f file but
 	// it usually is the TIB.
-	function fortheval(input) {
+	function dictate(input) {
 		var tibwas=tib, ntibwas=ntib, ipwas=ip;
 		tib = input; 
 		ntib = 0;
@@ -388,7 +388,7 @@ function Kvm() {
 		ntib = ntibwas;
 		ip = ipwas;
 	}
-	kvm.fortheval = fortheval;
+	kvm.dictate = dictate;
 
 	// -------------------- end of main() -----------------------------------------
 

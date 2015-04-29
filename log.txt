@@ -1,0 +1,58 @@
+ 
+			  ~%~%~%~%~%~%~%~  p r o j e c t - k  ~%~%~%~%~%~%~%~
+		      A Forth programming language implementation with the 
+		    same JavaScript *kernel* for many different applications.
+			    The project focuses on the JavaScript *kernel*. 
+			            Everything else is just for DEMO.
+				   http://github.com/hcchengithub/project-k
+
+---------- developping log --------------------------------------------------------------
+
+[x] hcchen5600 2015/04/28 11:03:11 
+	嘗試用 jeforth.3we 來引入爽哥的 jeForthVM.js 如此即可借用 jeforth.3we 的人機介面以及
+	現成的種種方便。還可以做 performance 的比較。這個辦法是先前玩 transpiler 時發展出來的。
+
+[x] 不容易看懂 The "multitaskjavascripteforth" porject，另謀它途。既然最大的差別是 inner loop
+	何不直接比一下速度？
+	for multitaskjavascripteforth
+		code swap function(){ 
+		  var b=dStk.pop(), a=dStk.pop();
+		  dStk.push(b);
+		  dStk.push(a);
+		} end-code
+		code precise-time(mS) function(){dStk.push((new Date()).getTime())} end-code
+		code space function(){type(" ")} end-code
+		: speed-test 0 swap for 1+ next ;
+		precise-time(mS) 1000000 speed-test . space precise-time(mS) swap - . 
+	for jeforth.3we 同上兩行。
+	結果：
+		multitaskjavascripteforth ~ 4000
+		jeforth.3we ~ 660 快了約 6 倍。
+	所以，先別管 inner loop 的差別了。
+	
+[ ]	"multitaskjavascripteforth" 的十一條建議：
+	 1、exec(tib) 建議命名為 dictate(tib) , 英文 Dictate（吩咐）似乎像
+		在對 Forth 交代工作。hcchen5600 2015/04/27 15:18:26
+	 2、waiting 以及 resume 如何運作，需要指導。 hcchen5600 2015/04/27 15:20:02
+	 3、建議以 comma(x) 為名。x is anything, 配合 tick(name) 成為 
+		comma(tick(‘wordName’)) 即可編譯 word 進字典。 hcchen5600 2015/04/27 15:25:22
+	 4、rstack 或 rStack 不要簡寫。 hcchen5600 2015/04/27 15:26:26
+	 5、用得很多，建議單稱 stack , 不要簡寫。
+	 6、用得很多，建議直接命名為 push(t) 。 hcchen5600 2015/04/27 15:28:49
+	 7、建議稱為 tick(n) hcchen5600 2015/04/27 15:34:57
+	 8、稱為 comma(x) , 配合 tick(n) 使用：comma(tick(‘namd’))
+	 9、var w = new Word(‘name’); last().xt = function(){…}; last().vid = ‘forth’; 
+		這樣比較好懂，也符合 forth 的慣例 （例如 immediate 就是等前一個 word 產生之
+		後才填的屬性） hcchen5600 2015/04/27 16:16:16
+	10、建議提供 last(void) , 故 last().compileOnly=true; last().immediate=true; 感
+		覺比簡寫好。 hcchen5600 2015/04/27 16:18:15
+	11、另一種設計是： vocs = [‘forth’, ‘assembler’, ‘excel’, ‘canvas’]; words.forth[] 
+		是 forth vocabulary, 另有 words.assembler[], words.excel[], 以及 words.canvas[] 等。
+		用哪一種好，應該怎麼決定？ hcchen5600 2015/04/27 16:23:00	
+	
+		
+		
+		
+		
+		
+		

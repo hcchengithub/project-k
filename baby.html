@@ -35,13 +35,13 @@
                 // $("#kernelf").hide();
                 document.onkeydown = hotKeyHandler; // Must be using onkeydown so as to grab the control.
                 kvm.init();
-                kvm.fortheval(kernelfsource.value);
+                kvm.dictate(kernelfsource.value);
             }
         );
 
         function forthConsoleHandler(cmd) {
             printStr((cmd?'\n> ':"")+cmd+'\n');
-            kvm.fortheval(cmd);  // Pass the command line to KsanaVM
+            kvm.dictate(cmd);  // Pass the command line to KsanaVM
             printStr(" " + kvm.prompt + " ");
             jump2endofinputbox.click(); inputbox.focus();
         }
