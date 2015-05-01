@@ -20,7 +20,7 @@ project-k
  2. kernel.f （僅供參考）
  3. quit.f （無形，或僅供建議）
 
-如何 include kernel.js （video）
+如何 include kernel.js [（video）](http://www.camdemy.com/media/19528)
 -----------------------------
 
 kernel.js 提供的是一個 Forth VM 的 constructor. 暫且沿用 Yap 先生原創，名為 KsanaVM(). 以下例舉使用 KsanaVM() 生成 kvm 的幾種方式。其中 kvm 即本 Forth VM 的 instance. 可視需要任意命名，但注意 instance 的取名當然會牽動整套 application. 
@@ -42,7 +42,7 @@ kernel.js 提供的是一個 Forth VM 的 constructor. 暫且沿用 Yap 先生原創，名為 Ksan
     eval(readTextFile(".\\kernel.js"));
     kvm = new KsanaVM();
 
-以 Node.js 空手直接使用 kernel.js (video)
+以 Node.js 空手直接使用 kernel.js [（video）](http://www.camdemy.com/media/19529)
 --------------------------------------------------
 
 這很好玩，您不必熟悉 JavaScript。藉由手動操作，做一遍就應該對本 project 會有很清楚的認識。
@@ -51,11 +51,11 @@ kernel.js 提供的是一個 Forth VM 的 constructor. 暫且沿用 Yap 先生原創，名為 Ksan
 
     node.exe
     
-(2). Do the above **b.** to create **kvm** under the Node.js console.
+(2). Do the [above **b.**](http://www.camdemy.com/media/19528) to create **kvm** under the Node.js console.
 
-(3). Define **printStr()** for the specific application. For Node.js text console in this example case:
+(3). Define **type()** for the specific application. For Node.js text console in this example case:
 
-    kvm.printStr = function (s) { 
+    kvm.type = function (s) { 
 	    try {
             var ss = s + '';
         } catch(err) {
@@ -64,14 +64,14 @@ kernel.js 提供的是一個 Forth VM 的 constructor. 暫且沿用 Yap 先生原創，名為 Ksan
         process.stdout.write(ss);
     }
 
-(4). Test kvm.printStr('abc')
+(4). Test kvm.type('abc')
 
 (5). Play around with kvm properties and methods
 
     kvm.init()
     kvm.dictate("123")
     kvm.stack()
-    kvm.dictate("code hi printStr('Hello World!!') end-code")
+    kvm.dictate("code hi type('Hello World!!') end-code")
     kvm.dictate("hi")
     kvm.words
     kvm.dictionary
