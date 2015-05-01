@@ -12,9 +12,10 @@
     <script src="jquery-1.11.2.js"></script>
 	<Script src="kernel.js"></Script>
 	<script id=js>
+	window.kvm = new KsanaVM();
 	(function(){
 		// I/O
-		var printStr = kvm.printStr = function (s) { 
+		var type = kvm.type = function (s) { 
 			try {
 				var ss = s + ''; // Print-able test
 			} catch(err) {
@@ -40,9 +41,9 @@
 		);
 
 		function forthConsoleHandler(cmd) {
-            printStr((cmd?'\n> ':"")+cmd+'\n');
+            type((cmd?'\n> ':"")+cmd+'\n');
 			kvm.dictate(cmd);  // Pass the command line to KsanaVM
-			printStr(" " + kvm.prompt + " ");
+			type(" " + kvm.prompt + " ");
 			jump2endofinputbox.click(); inputbox.focus();
 		}
 
@@ -205,21 +206,21 @@ code init		( -- ) \ Initialize g.members that are moved out from jeforth.js whic
 						case "array" :
 							if (obj.constructor != Word) {
 								if (obj&&obj.toString) 
-									printStr(obj.toString() + '\n');
+									type(obj.toString() + '\n');
 								else 
-									printStr(Object.prototype.toString.apply(obj) + '\n');
+									type(Object.prototype.toString.apply(obj) + '\n');
 								for(var i in obj) {
-									printStr(tab + i + " : ");  // Entire array already printed here.
+									type(tab + i + " : ");  // Entire array already printed here.
 									if (obj[i] && obj[i].toString || obj[i]===0) 
-										printStr(tab + obj[i].toString() + '\n');
+										type(tab + obj[i].toString() + '\n');
 									else
-										printStr(tab + Object.prototype.toString.apply(obj[i]) + '\n');
+										type(tab + Object.prototype.toString.apply(obj[i]) + '\n');
 								}
 								break;  // if is Word then do default
 							}
 						default : // Word(), Constant(), number, string, null, undefined
 							var ss = obj + ''; // Print-able test
-							printStr(ss + " (" + mytypeof(obj) + ")\n");
+							type(ss + " (" + mytypeof(obj) + ")\n");
 					}
 				}
 				g.debugInner = function (entry, resuming) {
@@ -236,7 +237,7 @@ code init		( -- ) \ Initialize g.members that are moved out from jeforth.js whic
 					} while(ip && resuming); // ip==0 means resuming has done
 				}
 				end-code init
-code words 		for(var i=1; i<words.forth.length; i++) printStr(words.forth[i].name+" ") end-code // ( -- ) List all words
+code words 		for(var i=1; i<words.forth.length; i++) type(words.forth[i].name+" ") end-code // ( -- ) List all words
 code <selftest>	( <statements> -- ) \ Collect self-test statements. interpret-only
 				push(nexttoken("</selftest>"));
 				end-code
@@ -335,7 +336,7 @@ code immediate  ( -- ) \ Make the last new word an immediate.
 				</selftest>
 
 code .((		( <str> -- ) \ Print following string down to '))' immediately.
-				printStr(nexttoken('\\)\\)'));ntib+=2; end-code immediate
+				type(nexttoken('\\)\\)'));ntib+=2; end-code immediate
 
 code \          ( <comment> -- ) \ Comment down to the next '\n'.
                 nexttoken('\n') end-code immediate
@@ -380,7 +381,7 @@ code compile-only  ( -- ) \ Make the last new word a compile-only.
 
 code (create)	( "name" -- ) \ Create a code word that has a dummy xt, not added into wordhash{} yet
                 if(!(newname=pop())) panic("Create what?\n", tib.length-ntib>100);
-                if(isReDef(newname)) printStr("reDef "+newname+"\n"); // 若用 tick(newname) 就錯了
+                if(isReDef(newname)) type("reDef "+newname+"\n"); // 若用 tick(newname) 就錯了
                 current_word_list().push(new Word([newname,function(){}]));
 				last().vid = current; // vocabulary ID
 				last().wid = current_word_list().length-1; // word ID
@@ -932,7 +933,7 @@ code roll       ( ... n3 n2 n1 n0 3 -- ... n2 n1 n0 n3 )
 					r> r> r> and and ==>judge drop
 				</selftest>
 code .          ( sth -- ) \ Print number or string on TOS.
-				printStr(pop());
+				type(pop());
 				end-code
 
 : space      	(space) . ; // ( -- ) Print a space.
@@ -1480,8 +1481,8 @@ code stopSleeping ( -- ) \ Resume forth VM sleeping state, opposite of the sleep
 				</js> ;
 				/// nap 不用 g.setTimeout 故不能中止，也不會堆積在 g.setTimeout.registered() 裡。
 
-: cr         	js: printStr("\n") ; // ( -- ) 到下一列繼續輸出 *** 20111224 sam
-				\ 個別 quit.f 裡重定義成 : cr js: printStr("\n") 1 nap js: jump2endofinputbox.click() ;
+: cr         	js: type("\n") ; // ( -- ) 到下一列繼續輸出 *** 20111224 sam
+				\ 個別 quit.f 裡重定義成 : cr js: type("\n") 1 nap js: jump2endofinputbox.click() ;
 
 code cut		( -- ) \ Cut off used TIB.
 				tib=tib.slice(ntib);ntib=0 end-code
@@ -1594,7 +1595,7 @@ code .r         ( num|str n -- ) \ Right adjusted print num|str in n characters 
 					i=" "+i;
 					n--;
 				} while(n>0);
-                printStr(i);
+                type(i);
                 end-code
 
 code .0r        ( num|str n -- ) \ Right adjusted print num|str in n characters (FigTaiwan SamSuanChen)
@@ -1613,7 +1614,7 @@ code .0r        ( num|str n -- ) \ Right adjusted print num|str in n characters 
 					i="0"+i;
 					n--;
 				} while (n>0);
-                printStr(minus+i);
+                type(minus+i);
                 end-code
 				/// Limitation: Negative numbers are printed in a strange way. e.g. "0000-123".
 				/// We need to take care of that separately.
@@ -1682,8 +1683,8 @@ code .s         ( ... -- ... ) \ Dump the data stack.
 					} else {
 						push(stack[i]); push(i); dictate("decimal 7 .r char : . space .");
 					}
-					printStr(" ("+mytypeof(stack[i])+")\n");
-                } else printStr("empty\n");
+					type(" ("+mytypeof(stack[i])+")\n");
+                } else type("empty\n");
 				kvm.base = basewas;
                 end-code
 
@@ -1750,7 +1751,7 @@ code (words)    ( "option" "word-list" "pattern" -- word[] ) \ Get an array of w
 					var word_list = pop();
 					var w = "";
 					for (var i=0; i<word_list.length; i++) w += word_list[i].name + " ";
-					printStr(w);
+					type(w);
 				</js> ;
 				/// Search the pattern in help and comments also.
 
@@ -1759,8 +1760,8 @@ code (words)    ( "option" "word-list" "pattern" -- word[] ) \ Get an array of w
 					char forth swap "" -rot (words) <js>
 						var word_list = pop();
 						for (var i=0; i<word_list.length; i++) {
-							printStr(word_list[i].name + " " + word_list[i] + "\n");
-							if (typeof(word_list[i].comment) != "undefined") printStr(" "+word_list[i].comment+"\n");
+							type(word_list[i].name + " " + word_list[i].help + "\n");
+							if (typeof(word_list[i].comment) != "undefined") type(" "+word_list[i].comment+"\n");
 						}
 					</js>
 				else
@@ -1924,9 +1925,9 @@ code isSameArray ( a1 a2 -- T|F ) \ Compare two arrays.
 code (?)        ( a -- ) \ print value of the variable consider ret and exit
 				var x = dictionary[pop()];
 				switch(x){
-					case null: printStr('RET');break;
-					case "": printStr('EXIT');break;
-					default: printStr(x);
+					case null: type('RET');break;
+					case "": type('EXIT');break;
+					default: type(x);
 				}; end-code
 
 : (dump)		( addr -- ) \ dump one cell of dictionary
@@ -1957,24 +1958,24 @@ code (see)      ( thing -- ) \ See into the given word, object, array, ... anyth
                         if (typeof(w[i])=="function") continue;
                         if (i=="comment") continue;
                         push(i); dictate("16 .r s'  : ' .");
-                        printStr(w[i]+" ("+mytypeof(w[i])+")\n");
+                        type(w[i]+" ("+mytypeof(w[i])+")\n");
                     }
                     if (w.type.indexOf("colon")!=-1){
                         var i = w.cfa;
-                        printStr("\n-------- Definition in dictionary --------\n");
+                        type("\n-------- Definition in dictionary --------\n");
                         do {
 							push(i); execute("(dump)");
                         } while (dictionary[i++] != RET);
-                        printStr("---------- End of the definition -----------\n");
+                        type("---------- End of the definition -----------\n");
                     } else {
                         for(var i in w){
                             if (typeof(w[i])!="function") continue;
                             // if (i=="selfTest") continue;
                             push(i); dictate("16 .r s'  :\n' .");
-                            printStr(w[i]+"\n");
+                            type(w[i]+"\n");
                         }
                     }
-                    if (w.comment != undefined) printStr("\ncomment:\n"+w.comment+"\n");
+                    if (w.comment != undefined) type("\ncomment:\n"+w.comment+"\n");
                 }
 				kvm.base = basewas;
                 end-code
@@ -1997,7 +1998,7 @@ code (see)      ( thing -- ) \ See into the given word, object, array, ... anyth
 code notpass	( -- ) \ List words their sleftest flag are not 'pass'.
 				for (var j in words) { // all word-lists
 					for (var i in words[j]) {  // all words in a word-list
-						if(i!=0 && words[j][i].selftest != 'pass') printStr(words[j][i].name+" ");
+						if(i!=0 && words[j][i].selftest != 'pass') type(words[j][i].name+" ");
 					}
 				}
 				end-code

@@ -1,6 +1,6 @@
 "uses strict";
-function Kvm() {     
-	var kvm = this;
+function KsanaVM() {     
+	var vm = this;
 	var ip=0;
 	var stack = [] ;
 	var stackwas = []; // Definition of : ... ; needs a temp storage.
@@ -22,12 +22,11 @@ function Kvm() {
 	var newname = ""; // new word's name
 	var newxt = function(){}; // new word's function()
 	var newhelp = "";
-	var colonxt = function(){}; // colon word's xt function is a constant
-	var printStr = function(){}; // dummy 
+	var type = function(){}; // dummy 
 	var g = {}; // global hash
 
-	kvm.init = function () { 
-		printStr = kvm.printStr;
+	vm.init = function () { 
+		type = vm.type;
 	}
 	
 	function Word(a) {
@@ -38,7 +37,7 @@ function Kvm() {
 			eval(statement);
 		}
 	}
-	Word.prototype.toString = function(){return this.help}; // every word introduces itself
+	Word.prototype.toString = function(){return this.name + " " + this.help}; // every word introduces itself
 	
 	// Support Vocabulary
 	function last(){  // returns the last defined word.
@@ -59,7 +58,7 @@ function Kvm() {
 		compiling=false;
 		ip=0; // forth VM instruction pointer
 		stop = true; // ntib = tib.length; // reserve tib and ntib for debug
-		printStr('-------------- Reset forth VM --------------\n');
+		type('-------------- Reset forth VM --------------\n');
 	}
 	
 	function panic(msg,severe) {
@@ -77,7 +76,7 @@ function Kvm() {
 		var beforetib = tib.substr(Math.max(ntib-40,0),40);
 		var aftertib  = tib.substr(ntib,80);
 		t += "tib: " + beforetib + "<ntib>" + aftertib + "...\n";
-		printStr(t);
+		type(t);
 		if(compiling) {
 			compiling = false;
 			stop = true; // ntib = tib.length;
@@ -267,8 +266,9 @@ function Kvm() {
 
 	// -------------------------- the outer loop ----------------------------------------------------
 	// forth outer loop, 
-	// If entry is given then resume from the entry point by executing the remaining colon thread 
-	// from entry and then the tib/ntib string.
+	// If entry is given then resume from the entry point by executing 
+	// the remaining colon thread down until ip reaches 0. That's resume.
+	// Then proceed with the tib/ntib string.
 	// 
 	function outer(entry) {
 		if (entry) inner(entry, true); // resume from the breakpoint 
@@ -277,38 +277,37 @@ function Kvm() {
 			if (token==="") break;    // TIB 收完了， loop 出口在這裡。
 			outerExecute(token);
 		}
-	}
-	
-	// 單處理一個 token. 
-	function outerExecute(token){
-		var w = tick(token);   // not found is 0. w is an Word object.
-		if (w) {
-			if(!compiling){ // interpret state or immediate words
-				if (w.compileonly) {
-					panic("Error! "+token+" is compile-only.\n", tib.length-ntib>100);
-					return;
-				}
-				execute(w);
-			} else { // compile state
-				if (w.immediate) {
-					execute(w); // inner(w);
-				} else {
-					if (w.interpretonly) {
-						panic("Error! "+token+" is interpret-only.\n", tib.length-ntib>100);
+		// 單處理一個 token. 
+		function outerExecute(token){
+			var w = tick(token);   // not found is 0. w is an Word object.
+			if (w) {
+				if(!compiling){ // interpret state or immediate words
+					if (w.compileonly) {
+						panic("Error! "+token+" is compile-only.\n", tib.length-ntib>100);
 						return;
 					}
-					comma(w); // 將 w 編入 dictionary. w is a Word() object
+					execute(w);
+				} else { // compile state
+					if (w.immediate) {
+						execute(w); // inner(w);
+					} else {
+						if (w.interpretonly) {
+							panic("Error! "+token+" is interpret-only.\n", tib.length-ntib>100);
+							return;
+						}
+						comma(w); // 將 w 編入 dictionary. w is a Word() object
+					}
 				}
+			} else if (isNaN(token)) {
+				// parseInt('123abc') 的結果是 123 很危險! 所以前面要用 isNaN() 先檢驗。		
+				panic("Error! "+token+" unknown.\n", tib.length-ntib>100);
+				return;
+			} else {
+				if(token.substr(0,2).toLowerCase()=="0x") var n = parseInt(token);
+				else  var n = parseFloat(token);
+				push(n);
+				if (compiling) execute("literal");
 			}
-		} else if (isNaN(token)) {
-			// parseInt('123abc') 的結果是 123 很危險! 所以前面要用 isNaN() 先檢驗。		
-			panic("Error! "+token+" unknown.\n", tib.length-ntib>100);
-			return;
-		} else {
-			if(token.substr(0,2).toLowerCase()=="0x") var n = parseInt(token);
-			else  var n = parseFloat(token);
-			push(n);
-			if (compiling) execute("literal");
 		}
 	}
 	// ### End of the outer loop ###
@@ -321,10 +320,11 @@ function Kvm() {
 	// keyboard input is difficult to me on an event-driven or a non-blocking 
 	// environment like Node-webkit.
 	function docode() {
-	    // 將來所有的 code words 都會認得這裡的 local variables 所以這裡面要避免用到任何 local variable。 
+	    // 將來所有的 code words 都會認得這裡的 local variables 所以這裡面要避免
+		// 用到任何 local variable。 外面的 vm global variables & functions 當然都認得。
 		compiling = "code"; // it's true and a clue of compiling a code word.
 		newname = nexttoken();
-		if(isReDef(newname)) printStr("reDef "+newname+"\n"); 	// 若用 tick(newname) 就錯了
+		if(isReDef(newname)) type("reDef "+newname+"\n"); 	// 若用 tick(newname) 就錯了
 		push(nextstring("end-code")); 
 		if(tos().flag){
 			eval(
@@ -388,7 +388,7 @@ function Kvm() {
 		ntib = ntibwas;
 		ip = ipwas;
 	}
-	kvm.dictate = dictate;
+	vm.dictate = dictate;
 
 	// -------------------- end of main() -----------------------------------------
 
@@ -459,11 +459,10 @@ function Kvm() {
 	// js> mytypeof({})           \ ==> object (string)
 	// js> mytypeof(null)         \ ==> null (string)  
 
-	kvm.stack = function(){return(stack)}; // debug easier. stack 常被改，留在 kvm 裡可能是舊版，所以要隨時從肚子裡抓。
-	kvm.rstack = function(){return(rstack)}; // debug easier especially debugging TSR
-	kvm.words = words; // debug easier
-	kvm.dictionary = dictionary; // debug easier
+	vm.stack = function(){return(stack)}; // debug easier. stack 常被改，留在 vm 裡可能是舊版，所以要隨時從肚子裡抓。
+	vm.rstack = function(){return(rstack)}; // debug easier especially debugging TSR
+	vm.words = words; // debug easier
+	vm.dictionary = dictionary; // debug easier
 }
-var kvm = new Kvm();
-if (typeof exports!='undefined') exports.kvm = kvm;	// export for node.js APP
+if (typeof exports!='undefined') exports.KsanaVM = KsanaVM;	// export for node.js APP
 

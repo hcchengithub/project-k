@@ -1,9 +1,6 @@
-code //         var s = nexttoken('\n|\r');
-                last().help = newname + " " + s;
-                end-code
-				// ( <comment> -- ) Give help message to the new word.
-
-code parse-help	var ss = " "+pop()+" ", comment = "";
+code // 		var s = nexttoken('\n|\r'); last().help = s; end-code // ( <comment> -- ) Give help message to the last word.
+code stop 		stop=true end-code // ( -- ) Stop the TIB loop
+code parse-help	var ss = " " + pop() + " ", comment = "";
 				var stackDiagram = ss.match(/^\s+(\(\s.*\s\))\s+(.*)/); // null or [0] entire line, [1] (...), [2] the rest.
 				if(stackDiagram) { 
 					comment = (" "+stackDiagram[2]+" ").match(/^\s+\\\s+(.*\S)\s+/); // null or [0] entire line, [1] comment
@@ -25,20 +22,17 @@ code parse-help	var ss = " "+pop()+" ", comment = "";
 					}
 				}	
 				end-code		
-				// ( "str" -- "helpmsg" "rests" ) Parse help message
-
-code code2		push(nexttoken('\n|\r')); 
-				execute("parse-help"); // ( "helpmsg" "rests" )
-				tib = pop() + tib.slice(ntib);
+				// ( "line" -- "helpmsg" "rests" ) Parse "( -- ) \ help foo baa" from the line
+code code		push(nexttoken()); 
+				push(nexttoken('\n|\r')); 
+				execute("parse-help"); // ( "name" "helpmsg" "rests" )
+				tib = pop() + tib.slice(ntib); // "rests" + tib(ntib)
 				ntib = 0;
 				newhelp = pop();
-				execute("code");
+				tib = pop() + " " + tib; // "name" + tib
+				execute(words.forth[1]);
 				end-code
-
-code stop stop=true end-code
-stop
-				
-
+				// ( <name ..code..> -- ) Start composing a code word.
 code init		( -- ) \ Initialize g.members that are moved out from jeforth.js which is thus kept pure.
 				// An array's length is array.length but there's no such thing of hash.length for hash{}.
 				// memberCount(object) gets the given object's member count which is also a hash table's length.
@@ -132,21 +126,21 @@ code init		( -- ) \ Initialize g.members that are moved out from jeforth.js whic
 						case "array" :
 							if (obj.constructor != Word) {
 								if (obj&&obj.toString) 
-									print(obj.toString() + '\n');
+									type(obj.toString() + '\n');
 								else 
-									print(Object.prototype.toString.apply(obj) + '\n');
+									type(Object.prototype.toString.apply(obj) + '\n');
 								for(var i in obj) {
-									print(tab + i + " : ");  // Entire array already printed here.
+									type(tab + i + " : ");  // Entire array already printed here.
 									if (obj[i] && obj[i].toString || obj[i]===0) 
-										print(tab + obj[i].toString() + '\n');
+										type(tab + obj[i].toString() + '\n');
 									else
-										print(tab + Object.prototype.toString.apply(obj[i]) + '\n');
+										type(tab + Object.prototype.toString.apply(obj[i]) + '\n');
 								}
 								break;  // if is Word then do default
 							}
 						default : // Word(), Constant(), number, string, null, undefined
 							var ss = obj + ''; // Print-able test
-							print(ss + " (" + mytypeof(obj) + ")\n");
+							type(ss + " (" + mytypeof(obj) + ")\n");
 					}
 				}
 				g.debugInner = function (entry, resuming) {
@@ -163,10 +157,7 @@ code init		( -- ) \ Initialize g.members that are moved out from jeforth.js whic
 					} while(ip && resuming); // ip==0 means resuming has done
 				}
 				end-code init
-
-code version    ( -- revision ) \ print the greeting message and return the revision code
-				push(kvm.greeting()) end-code
-
+code words 		for(var i=1; i<words.forth.length; i++) type(words.forth[i].name+" ") end-code // ( -- ) List all words
 code <selftest>	( <statements> -- ) \ Collect self-test statements. interpret-only
 				push(nexttoken("</selftest>"));
 				end-code
@@ -265,7 +256,7 @@ code immediate  ( -- ) \ Make the last new word an immediate.
 				</selftest>
 
 code .((		( <str> -- ) \ Print following string down to '))' immediately.
-				print(nexttoken('\\)\\)'));ntib+=2; end-code immediate
+				type(nexttoken('\\)\\)'));ntib+=2; end-code immediate
 
 code \          ( <comment> -- ) \ Comment down to the next '\n'.
                 nexttoken('\n') end-code immediate
@@ -310,12 +301,12 @@ code compile-only  ( -- ) \ Make the last new word a compile-only.
 
 code (create)	( "name" -- ) \ Create a code word that has a dummy xt, not added into wordhash{} yet
                 if(!(newname=pop())) panic("Create what?\n", tib.length-ntib>100);
-                if(isReDef(newname)) print("reDef "+newname+"\n"); // 若用 tick(newname) 就錯了
+                if(isReDef(newname)) type("reDef "+newname+"\n"); // 若用 tick(newname) 就錯了
                 current_word_list().push(new Word([newname,function(){}]));
 				last().vid = current; // vocabulary ID
 				last().wid = current_word_list().length-1; // word ID
 				last().type = "colon-create";
-				last().help = newname + " " + packhelp(); // help messages packed
+				// last().help = newname + " " + packhelp(); // help messages packed
                 end-code
 
 code reveal		( -- ) \ Add the last word into wordhash
@@ -332,11 +323,6 @@ code reveal		( -- ) \ Add the last word into wordhash
 						[then]
 						(forget)
 				</selftest>
-
-code //         ( <comment> -- ) \ Give help message to the new word.
-                var s = nexttoken('\n|\r');
-                last().help = newname + " " + s;
-                end-code interpret-only
 
 				<selftest>
 					depth [if] .( Data stack should be empty! ) cr \s [then]
@@ -393,7 +379,7 @@ code CR 		push("\n") end-code // ( -- '\n' ) NewLine is ASCII 10(0x0A)
 						CR js> String.fromCharCode(10) = ==>judge drop
 				</selftest>
 
-code jsEval 	( <string> -- result ) \ Evaluate the given JavaScript statements, return the last statement's value.
+code jsEval 	( "js code" -- result ) \ Evaluate the given JavaScript statements, return the last statement's value.
                 try {
                   push(eval(pop()));
                 } catch(err) {
@@ -406,7 +392,7 @@ code jsEval 	( <string> -- result ) \ Evaluate the given JavaScript statements, 
 						char 123 jsEval 123 ( .s ) = ==>judge drop
 				</selftest>
 
-code jsEvalNo 	( <string> -- ) \ Evaluate the given JavaScript statements, w/o return value.
+code jsEvalNo 	( "js code" -- ) \ Evaluate the given JavaScript statements, w/o return value.
                 try {
                   eval(pop());
                 } catch(err) {
@@ -420,7 +406,7 @@ code jsEvalNo 	( <string> -- ) \ Evaluate the given JavaScript statements, w/o r
 						456 char 123 jsEvalNo 456 ( .s ) = ==>judge drop
 				</selftest>
 
-code jsFunc		( "statements" -- function ) \ Compile JavaScript to a function() that returns last statement
+code jsFunc		( "js code" -- function ) \ Compile JavaScript to a function() that returns last statement
 				var ss=pop();
 				ss = ss.replace(/(^( |\t)*)|(( |\t)*$)/gm,''); // remove 頭尾 white spaces
 				ss = ss.replace(/\s*\/\/.*$/gm,''); // remove // comments
@@ -435,10 +421,9 @@ code jsFunc		( "statements" -- function ) \ Compile JavaScript to a function() t
 				}
 				end-code
 				
-code jsFuncNo	( "statements" -- function ) \ Compile JavaScript to a function()
+code jsFuncNo	( "js code" -- function ) \ Compile JavaScript to a function()
 				eval("push(function(){" + pop() + "})"); 
 				end-code
-
 code [          compiling=false end-code immediate // ( -- ) 進入直譯狀態, 輸入指令將會直接執行 *** 20111224 sam
 code ]          compiling=true end-code // ( -- ) 進入編譯狀態, 輸入指令將會編碼到系統 dictionary *** 20111224 sam
 code compiling  push(compiling) end-code // ( -- boolean ) Get system state
@@ -452,7 +437,7 @@ code last 		push(last()) end-code // ( -- word ) Get the word that was last defi
 				</selftest>
 
 code exit       ( -- ) \ Exit this colon word.
-				dictcompile(EXIT) end-code immediate compile-only
+				comma(EXIT) end-code immediate compile-only
 
 				<selftest>
 					depth [if] .( Data stack should be empty! ) cr \s [then]
@@ -463,7 +448,7 @@ code exit       ( -- ) \ Exit this colon word.
 				</selftest>
 
 code ret        ( -- ) \ Mark at the end of a colon word.
-				dictcompile(RET) end-code immediate compile-only
+				comma(RET) end-code immediate compile-only
 
 code rescan-word-hash ( -- ) \ Rescan all word-lists in the order[] to rebuild wordhash{}
 				wordhash = {};
@@ -494,13 +479,17 @@ code (forget) 	( -- ) \ Forget the last word
 						[if] <js> ['</'+'js>', '</'+'jsN>'] </jsV> all-pass [then]
 					[then]
 				</selftest>
-
 code :          ( <name> -- ) \ Begin a forth colon definition.
                 newname = nexttoken();
-                newhelp = newname + " " + packhelp(); // help messages packed
+				push(nexttoken('\n|\r')); 
+				execute("parse-help"); // ( "name" "helpmsg" "rests" )
+				tib = pop() + tib.slice(ntib); // "rests" + tib(ntib)
+				ntib = 0;
+				newhelp = pop();
 				push(newname); execute("(create)"); // 故 colon definition 裡有 last or last() 可用來取得本身。
                 compiling=true;
 				stackwas = stack.slice(0); // Should not be changed, ';' will check.
+// debugger; // [ ]
 				last().type = "colon";
 				last().cfa = here;
 				last().help = newhelp;
@@ -511,11 +500,12 @@ code :          ( <name> -- ) \ Begin a forth colon definition.
                 end-code
 
 code ;          ( -- ) \ End of the colon definition.
+// debugger; // [ ]
                 if (!g.isSameArray(stackwas,stack)) {
                     panic("Stack changed during colon definition, it must be a mistake!\n", "error");
 					words[current].pop();
                 } else {
-					dictcompile(RET);
+					comma(RET);
                 }
                 compiling = false;
 				execute('reveal');
@@ -540,8 +530,8 @@ code '         	( <name> -- Word ) \ Tick, get word name from TIB, leave the Wor
 						(forget)
 				</selftest>
 
-code 			#tib push(ntib) end-code // ( -- n ) Get ntib
-code 			#tib! ntib = pop() end-code // ( n -- ) Set ntib
+code #tib 		push(ntib) end-code // ( -- n ) Get ntib
+code #tib! 		ntib = pop() end-code // ( n -- ) Set ntib
 
 \ ------------------ eforth code words ----------------------------------------------------------------------
 
@@ -802,7 +792,7 @@ code min        push(Math.min(pop(),pop())) end-code // ( a b -- min(a,b) ) The 
 
 code doVar      push(ip); ip=rstack.pop(); end-code compile-only // ( -- a ) 取隨後位址 a , runtime of created words
 code doNext     var i=rstack.pop()-1;if(i>0){ip=dictionary[ip]; rstack.push(i);}else ip++ end-code compile-only // ( -- ) next's runtime.
-code ,          dictcompile(pop()) end-code // ( n -- ) Compile TOS to dictionary.
+code ,          comma(pop()) end-code // ( n -- ) Compile TOS to dictionary.
 
 				<selftest>
 					depth [if] .( Data stack should be empty! ) cr \s [then]
@@ -863,7 +853,7 @@ code roll       ( ... n3 n2 n1 n0 3 -- ... n2 n1 n0 n3 )
 					r> r> r> and and ==>judge drop
 				</selftest>
 code .          ( sth -- ) \ Print number or string on TOS.
-				print(pop());
+				type(pop());
 				end-code
 
 : space      	(space) . ; // ( -- ) Print a space.
@@ -923,9 +913,8 @@ code (marker)   ( "name" -- ) \ Create marker "name". Run "name" to forget itsel
 				last().type = "marker";
                 last().herewas = here;
                 last().lengthwas = lengthwas; // [x] 引進 vocabulary 之後，此 marker 在只有 forth-wordlist 時使用。有了多個 word-list 之後要改寫。
-				var h = packhelp(); // help messages packed
-				if(h.indexOf("No help message")!=-1) h = "( -- ) I am a marker. I forget everything after me.";
-				last().help =newname + " " + h;
+				var h = "( -- ) I am a marker. I forget everything after me.";
+				last().help = h;
                 last().xt = function(){ // marker's xt restores the saved context
                     here = this.herewas;
 					order = [current = context = "forth"]; // 萬一此 marker 在引入 vocabulary 之後被 call 到。
@@ -940,7 +929,7 @@ code (marker)   ( "name" -- ) \ Create marker "name". Run "name" to forget itsel
                 end-code
 : marker     	( <name> -- ) \ Create marker <name>. Run <name> to forget itself and all newers.
 				BL word (marker) ;
-code next       compilecode("doNext");dictionary[here++]=pop(); end-code immediate compile-only // ( -- ) for ... next (FigTaiwan SamSuanChen)
+code next       comma(tick("doNext"));dictionary[here++]=pop(); end-code immediate compile-only // ( -- ) for ... next (FigTaiwan SamSuanChen)
 
 code cls		( -- ) \ Clear jeforth console screen
 				kvm.screenbuffer = (kvm.screenbuffer==null) ? null : "";
@@ -951,7 +940,7 @@ code abort      reset() end-code // ( -- ) Reset the forth system.
 code literal 	( n -- ) \ Compile TOS as an anonymous constant
 				var literal = pop();
 				var getLiteral = eval("var f;f=function(){push(literal)/*(" + mytypeof(literal) + ")" + literal.toString() + " */}");
-				dictcompile(getLiteral);
+				comma(getLiteral);
 				end-code
 code alias      ( Word <alias> -- ) \ Create a new name for an existing word
 				var w = pop();
@@ -962,7 +951,6 @@ code alias      ( Word <alias> -- ) \ Create a new name for an existing word
 				last().predecessor = last().name;
                 last().name = newname;
 				last().type = "alias";
-				last().help = last().name + last().help.match(/\S+\s*(\s.*)/)[1];
                 end-code
 
 				<selftest>
@@ -1413,8 +1401,8 @@ code stopSleeping ( -- ) \ Resume forth VM sleeping state, opposite of the sleep
 				</js> ;
 				/// nap 不用 g.setTimeout 故不能中止，也不會堆積在 g.setTimeout.registered() 裡。
 
-: cr         	js: print("\n") ; // ( -- ) 到下一列繼續輸出 *** 20111224 sam
-				\ 個別 quit.f 裡重定義成 : cr js: print("\n") 1 nap js: jump2endofinputbox.click() ;
+: cr         	js: type("\n") ; // ( -- ) 到下一列繼續輸出 *** 20111224 sam
+				\ 個別 quit.f 裡重定義成 : cr js: type("\n") 1 nap js: jump2endofinputbox.click() ;
 
 code cut		( -- ) \ Cut off used TIB.
 				tib=tib.slice(ntib);ntib=0 end-code
@@ -1527,7 +1515,7 @@ code .r         ( num|str n -- ) \ Right adjusted print num|str in n characters 
 					i=" "+i;
 					n--;
 				} while(n>0);
-                print(i);
+                type(i);
                 end-code
 
 code .0r        ( num|str n -- ) \ Right adjusted print num|str in n characters (FigTaiwan SamSuanChen)
@@ -1546,7 +1534,7 @@ code .0r        ( num|str n -- ) \ Right adjusted print num|str in n characters 
 					i="0"+i;
 					n--;
 				} while (n>0);
-                print(minus+i);
+                type(minus+i);
                 end-code
 				/// Limitation: Negative numbers are printed in a strange way. e.g. "0000-123".
 				/// We need to take care of that separately.
@@ -1615,8 +1603,8 @@ code .s         ( ... -- ... ) \ Dump the data stack.
 					} else {
 						push(stack[i]); push(i); dictate("decimal 7 .r char : . space .");
 					}
-					print(" ("+mytypeof(stack[i])+")\n");
-                } else print("empty\n");
+					type(" ("+mytypeof(stack[i])+")\n");
+                } else type("empty\n");
 				kvm.base = basewas;
                 end-code
 
@@ -1683,7 +1671,7 @@ code (words)    ( "option" "word-list" "pattern" -- word[] ) \ Get an array of w
 					var word_list = pop();
 					var w = "";
 					for (var i=0; i<word_list.length; i++) w += word_list[i].name + " ";
-					print(w);
+					type(w);
 				</js> ;
 				/// Search the pattern in help and comments also.
 
@@ -1692,8 +1680,8 @@ code (words)    ( "option" "word-list" "pattern" -- word[] ) \ Get an array of w
 					char forth swap "" -rot (words) <js>
 						var word_list = pop();
 						for (var i=0; i<word_list.length; i++) {
-							print(word_list[i]+"\n");
-							if (typeof(word_list[i].comment) != "undefined") print(" "+word_list[i].comment+"\n");
+							type(word_list[i].name + " " + word_list[i].help + "\n");
+							if (typeof(word_list[i].comment) != "undefined") type(" "+word_list[i].comment+"\n");
 						}
 					</js>
 				else
@@ -1857,9 +1845,9 @@ code isSameArray ( a1 a2 -- T|F ) \ Compare two arrays.
 code (?)        ( a -- ) \ print value of the variable consider ret and exit
 				var x = dictionary[pop()];
 				switch(x){
-					case null: print('RET');break;
-					case "": print('EXIT');break;
-					default: print(x);
+					case null: type('RET');break;
+					case "": type('EXIT');break;
+					default: type(x);
 				}; end-code
 
 : (dump)		( addr -- ) \ dump one cell of dictionary
@@ -1890,24 +1878,24 @@ code (see)      ( thing -- ) \ See into the given word, object, array, ... anyth
                         if (typeof(w[i])=="function") continue;
                         if (i=="comment") continue;
                         push(i); dictate("16 .r s'  : ' .");
-                        print(w[i]+" ("+mytypeof(w[i])+")\n");
+                        type(w[i]+" ("+mytypeof(w[i])+")\n");
                     }
                     if (w.type.indexOf("colon")!=-1){
                         var i = w.cfa;
-                        print("\n-------- Definition in dictionary --------\n");
+                        type("\n-------- Definition in dictionary --------\n");
                         do {
 							push(i); execute("(dump)");
                         } while (dictionary[i++] != RET);
-                        print("---------- End of the definition -----------\n");
+                        type("---------- End of the definition -----------\n");
                     } else {
                         for(var i in w){
                             if (typeof(w[i])!="function") continue;
                             // if (i=="selfTest") continue;
                             push(i); dictate("16 .r s'  :\n' .");
-                            print(w[i]+"\n");
+                            type(w[i]+"\n");
                         }
                     }
-                    if (w.comment != undefined) print("\ncomment:\n"+w.comment+"\n");
+                    if (w.comment != undefined) type("\ncomment:\n"+w.comment+"\n");
                 }
 				kvm.base = basewas;
                 end-code
@@ -1930,7 +1918,7 @@ code (see)      ( thing -- ) \ See into the given word, object, array, ... anyth
 code notpass	( -- ) \ List words their sleftest flag are not 'pass'.
 				for (var j in words) { // all word-lists
 					for (var i in words[j]) {  // all words in a word-list
-						if(i!=0 && words[j][i].selftest != 'pass') print(words[j][i].name+" ");
+						if(i!=0 && words[j][i].selftest != 'pass') type(words[j][i].name+" ");
 					}
 				}
 				end-code
@@ -1968,24 +1956,3 @@ code db			( -- ) \ Disable breakpoint, inner=fastInner. See also 'bp' command.
 				BL word compiling if literal compile (*debug*) 
 				else (*debug*) then ; immediate
 				/// resume() 線索由 data stack 傳回，故可以多重 debug。但有何用途？
-
-\ ----------------- play ground -------------------------------------
-
-\ ----------------- Self Test -------------------------------------
-
-<selftest>
-	<js> ['accept', 'refill', 'wut', '==>judge', 'all-pass', '***',
-		  '~~selftest~~', '.((', 'sleep'
-	] </jsV> all-pass
-	~~selftest~~ \ forget self-test temporary words
-</selftest>
-
-\ jeforth.f kernel code is now common for different application. I/O may not ready enough to read 
-\ selftest.f at this moment, so the below code has been moved to quit.f of each applications.
-	\ Do the jeforth.f self-test only when there's no command line
-	\	js> kvm.argv.length 1 > \ Do we have jobs from command line?
-	\	[if] \ We have jobs from command line to do. Disable self-test.
-	\		js: tick('<selftest>').enabled=false
-	\	[else] \ We don't have jobs from command line to do. So we do the self-test.
-	\		js> tick('<selftest>').enabled=true;tick('<selftest>').buffer tib.insert
-	\	[then] js: tick('<selftest>').buffer="" \ recycle the memory

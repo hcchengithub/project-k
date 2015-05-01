@@ -12,9 +12,10 @@
     <script src="jquery-1.11.2.js"></script>
     <Script src="kernel.js"></Script>
     <script id=js>
+	window.kvm = new KsanaVM();
     (function(){
         // I/O
-        var printStr = kvm.printStr = function (s) {
+        var type = kvm.type = function (s) {
             try {
                 var ss = s + ''; // Print-able test
             } catch(err) {
@@ -40,9 +41,9 @@
         );
 
         function forthConsoleHandler(cmd) {
-            printStr((cmd?'\n> ':"")+cmd+'\n');
+            type((cmd?'\n> ':"")+cmd+'\n');
             kvm.dictate(cmd);  // Pass the command line to KsanaVM
-            printStr(" " + kvm.prompt + " ");
+            type(" " + kvm.prompt + " ");
             jump2endofinputbox.click(); inputbox.focus();
         }
 
@@ -80,10 +81,10 @@
 code //     var s = nexttoken('\n|\r'); last().help = s; end-code 
             // ( <comment> -- ) Give help message to the last word.
 code cls    kvm.clearScreen() end-code // ( -- ) Clear output area
-code words  for(var i=1; i<words.forth.length; i++) printStr(words.forth[i].name+" ") end-code 
+code words  for(var i=1; i<words.forth.length; i++) type(words.forth[i].name+" ") end-code 
             // ( -- ) List all words
 code help   for(var i=1; i<words.forth.length; i++) 
-            printStr(words.forth[i].name+" "+words.forth[i]+'\n') 
+            type(words.forth[i].name+" "+words.forth[i].help+'\n') 
             end-code // ( -- ) List all words' help message
 code hide   $("#kernelf").hide() end-code // ( -- ) Hide the kernel.f textarea
 code show   $("#kernelf").show() end-code // ( -- ) Show the kernel.f textarea
