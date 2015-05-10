@@ -10,10 +10,12 @@
 			}
     </style>
     <script src="jquery-1.11.2.js"></script>
-	<Script src="kernel.js"></Script>
+	<Script src="jeforth.js"></Script>
 	<script id=js>
-	window.kvm = new KsanaVM();
+	window.kvm = new jeForth();
 	(function(){
+		// global
+		kvm.g = {};
 		// I/O
 		var type = kvm.type = function (s) { 
 			try {
@@ -36,7 +38,7 @@
 				$("#kernelf").hide();
 				document.onkeydown = hotKeyHandler; // Must be using onkeydown so as to grab the control.
 				kvm.init();
-				kvm.dictate(kernelfsource.value);
+				kvm.dictate(jeforthfsource.value);
 			}
 		);
 
@@ -77,7 +79,7 @@
 </head>
 <body>
 	<div><b>Forth kernel evaluation -- bbt.html FigTaiwan 2015</b></div><hr><i>Output area, 'cls' command to clear</i>
-	<div id="outputbox"><div id="kernelf">kernel.f<textarea id="kernelfsource" cols=100 rows=10>
+	<div id="outputbox"><div id="jeforthf">jeforth.f<textarea id="jeforthfsource" cols=100 rows=10>
 code // 		var s = nexttoken('\n|\r'); last().help = s; end-code // ( <comment> -- ) Give help message to the last word.
 code stop 		stop=true end-code // ( -- ) Stop the TIB loop
 code parse-help	var ss = " " + pop() + " ", comment = "";
@@ -113,16 +115,16 @@ code code		push(nexttoken());
 				execute(words.forth[1]);
 				end-code
 				// ( <name ..code..> -- ) Start composing a code word.
-code init		( -- ) \ Initialize g.members that are moved out from jeforth.js which is thus kept pure.
+code init		( -- ) \ Initialize kvm.g.members that are moved out from jeforth.js which is thus kept pure.
 				// An array's length is array.length but there's no such thing of hash.length for hash{}.
 				// memberCount(object) gets the given object's member count which is also a hash table's length.
-				g.memberCount = function (obj) {
+				kvm.g.memberCount = function (obj) {
 					var i=0;
 					for(var members in obj) i++;
 					return i;
 				}
 				// This is a useful common tool. Compare two arrays.
-				g.isSameArray = function (a,b) {
+				kvm.g.isSameArray = function (a,b) {
 					if (a.length != b.length) {
 						return false;
 					} else {
@@ -134,7 +136,7 @@ code init		( -- ) \ Initialize g.members that are moved out from jeforth.js whic
 									if (isNaN(a[i]) && isNaN(b[i])) continue; // because (NaN == NaN) 的結果是 false 所以要特別處理。
 								}
 								if (ta == "object") {  // 怎麼比較 obj? v2.05 之後用 memberCount()
-									if (g.memberCount(a[i]) != g.memberCount(b[i])) return false;
+									if (kvm.g.memberCount(a[i]) != kvm.g.memberCount(b[i])) return false;
 								} else if (a[i] != b[i]) return false;
 							} else if (a[i] != b[i]) return false;
 						}
@@ -143,7 +145,7 @@ code init		( -- ) \ Initialize g.members that are moved out from jeforth.js whic
 				}
 				// Tool, check if the item exists in the array or is it a member in the hash.
 				// return {flag, key}
-				g.isMember = function (item, thing){
+				kvm.g.isMember = function (item, thing){
 					var result = {flag:false, key:0};
 					if (mytypeof(thing) == "array") {
 						for (var i in thing) {
@@ -166,10 +168,10 @@ code init		( -- ) \ Initialize g.members that are moved out from jeforth.js whic
 				}
 				// How to clear all setInterval() and setTimeOut() without knowing their ID?
 				// http://stackoverflow.com/questions/8769598/how-to-clear-all-setinterval-and-settimeout-without-knowing-their-id
-				// 缺點是 g.setTimeout.registered() 會大量堆積，需 delete(g.setTimeout.registered()[id.toString()]) 既然還得記住
-				// timeoutId 使得 g.setTimeout() 的好處大打折扣。 查看： js> g.setTimeout.registered() (see)
-				// setInterval 比較不會大量堆積，最好還是要適時 delete。查看：js> g.setInterval.registered() (see)
-				g.setInterval = (function(){
+				// 缺點是 kvm.g.setTimeout.registered() 會大量堆積，需 delete(kvm.g.setTimeout.registered()[id.toString()]) 既然還得記住
+				// timeoutId 使得 kvm.g.setTimeout() 的好處大打折扣。 查看： js> kvm.g.setTimeout.registered() (see)
+				// setInterval 比較不會大量堆積，最好還是要適時 delete。查看：js> kvm.g.setInterval.registered() (see)
+				kvm.g.setInterval = (function(){
 					var registered={};
 					f = function(a,b){
 						var id = setInterval(a,b);
@@ -183,7 +185,7 @@ code init		( -- ) \ Initialize g.members that are moved out from jeforth.js whic
 					f.registered = function(){return(registered)};
 					return f;    
 				})();
-				g.setTimeout = (function(){
+				kvm.g.setTimeout = (function(){
 					var registered={};
 					f = function(a,b){
 						var id = setTimeout(a,b);
@@ -199,7 +201,7 @@ code init		( -- ) \ Initialize g.members that are moved out from jeforth.js whic
 				})();
 				// This is a useful common tool. Help to recursively see an object or forth Word.
 				// For forth Words, view the briefing. For other objects, try to see into it.
-				g.see = function (obj,tab){
+				kvm.g.see = function (obj,tab){
 					if (tab==undefined) tab = "  "; else tab += "  ";
 					switch(mytypeof(obj)){
 						case "object" :
@@ -223,7 +225,7 @@ code init		( -- ) \ Initialize g.members that are moved out from jeforth.js whic
 							type(ss + " (" + mytypeof(obj) + ")\n");
 					}
 				}
-				g.debugInner = function (entry, resuming) {
+				kvm.g.debugInner = function (entry, resuming) {
 					var w = phaseA(entry); // 翻譯成恰當的 w.
 					do{
 						while(w) { // 這裡是 forth inner loop 決戰速度之所在，奮力衝鋒！
@@ -581,7 +583,7 @@ code :          ( <name> -- ) \ Begin a forth colon definition.
 
 code ;          ( -- ) \ End of the colon definition.
 // debugger; // [ ]
-                if (!g.isSameArray(stackwas,stack)) {
+                if (!kvm.g.isSameArray(stackwas,stack)) {
                     panic("Stack changed during colon definition, it must be a mistake!\n", "error");
 					words[current].pop();
                 } else {
@@ -1412,20 +1414,20 @@ code accept		push(false) end-code // ( -- str T|F ) Read a line from terminal. A
 : constant 		( n <name> -- ) \ Create a 'constnat', Don't use " in <name>.
 				BL word (create) <js> 
 				last().type = "constant";
-				var s = 'var f;f=function(){push(g["' 
+				var s = 'var f;f=function(){push(kvm.g["' 
 						+ last().name 
 						+ '"])}';
 				last().xt = eval(s);
-				g[last().name] = pop();
+				kvm.g[last().name] = pop();
 				</js> reveal ; 
 : value 		( n <name> -- ) \ Create a 'value' variable, Don't use " in <name>.
 				constant last :: type='value' ; 
 : to 			( n <value> -- ) \ Assign n to <value>.
 				' ( word ) <js> if (tos().type!="value") panic("Error! Assigning to a none-value.\n",'error') </js>
 				compiling if ( word ) 
-					<js> var s='var f;f=function(){/* to */ g["'+pop().name+'"]=pop()}';push(eval(s))</js> ( f ) ,
+					<js> var s='var f;f=function(){/* to */ kvm.g["'+pop().name+'"]=pop()}';push(eval(s))</js> ( f ) ,
 				else ( n word )
-					js: g[pop().name]=pop()
+					js: kvm.g[pop().name]=pop()
 				then ; immediate
 				
 				<selftest>
@@ -1446,7 +1448,7 @@ code accept		push(false) end-code // ( -- str T|F ) Read a line from terminal. A
 				<js>
 					function resume() { 
 						if (!me.timeoutId) return; // 萬一想提前結束時其實已經 timeout 過了則不做事。
-						delete(g.setTimeout.registered()[me.timeoutId.toString()]);
+						delete(kvm.g.setTimeout.registered()[me.timeoutId.toString()]);
 						tib = tibwas; ntib = ntibwas; me.timeoutId = null;
 						outer(ipwas); // resume to the below ending 'ret' and then go through the TIB.
 					}
@@ -1456,7 +1458,7 @@ code accept		push(false) end-code // ( -- str T|F ) Read a line from terminal. A
 						panic("Error! double 'sleep' not allowed, use 'nap' instead.\n",true)
 					} else {
 						tib = ""; ntib = ip = 0; // ip = 0 reserve rstack, suspend the forth VM 
-						me.timeoutId = g.setTimeout(resume,delay);
+						me.timeoutId = kvm.g.setTimeout(resume,delay);
 					}
 				</js> ;
 				/// 為了要能 stopSleeping 引入了 sleep.timeoutId 致使多重 sleeping 必須禁止。
@@ -1472,14 +1474,14 @@ code stopSleeping ( -- ) \ Resume forth VM sleeping state, opposite of the sleep
 					var tibwas=tib, ntibwas=ntib, ipwas=ip, delay=pop();
 					tib = ""; ntib = ip = 0; // ip = 0 reserve rstack, suspend the forth VM 
 					// setTimeout(resume,delay);
-					var timeoutId = g.setTimeout(resume,delay);
+					var timeoutId = kvm.g.setTimeout(resume,delay);
 					function resume() { 
-						delete(g.setTimeout.registered()[timeoutId.toString()]);
+						delete(kvm.g.setTimeout.registered()[timeoutId.toString()]);
 						tib = tibwas; ntib = ntibwas;
 						outer(ipwas); // resume to the below ending 'ret' and then go through the TIB.
 					}
 				</js> ;
-				/// nap 不用 g.setTimeout 故不能中止，也不會堆積在 g.setTimeout.registered() 裡。
+				/// nap 不用 kvm.g.setTimeout 故不能中止，也不會堆積在 kvm.g.setTimeout.registered() 裡。
 
 : cr         	js: type("\n") ; // ( -- ) 到下一列繼續輸出 *** 20111224 sam
 				\ 個別 quit.f 裡重定義成 : cr js: type("\n") 1 nap js: jump2endofinputbox.click() ;
@@ -1915,11 +1917,11 @@ code tib.insert	( "string" -- ) \ Insert the "string" into TIB
 				/// initiate vocabulary for the including module
 
 code memberCount ( obj -- count ) \ Get hash table's length or an object's member count.
-				push(g.memberCount(pop()));
+				push(kvm.g.memberCount(pop()));
 				end-code
 
 code isSameArray ( a1 a2 -- T|F ) \ Compare two arrays.
-				push(g.isSameArray(pop(), pop()));
+				push(kvm.g.isSameArray(pop(), pop()));
 				end-code
 
 code (?)        ( a -- ) \ print value of the variable consider ret and exit
@@ -1952,7 +1954,7 @@ code (see)      ( thing -- ) \ See into the given word, object, array, ... anyth
                 var w=pop();
 				var basewas = kvm.base; kvm.base = 10;
                 if (!(w instanceof Word)) {
-                    g.see(w);  // none forth word objects. 意外的好處是不必有 "unkown word" 這種無聊的錯誤訊息。
+                    kvm.g.see(w);  // none forth word objects. 意外的好處是不必有 "unkown word" 這種無聊的錯誤訊息。
                 }else{
                     for(var i in w){
                         if (typeof(w[i])=="function") continue;
@@ -2016,10 +2018,10 @@ code notpass	( -- ) \ List words their sleftest flag are not 'pass'.
 
 js> inner constant fastInner // ( -- inner ) Original inner() without breakpoint support
 code bp			( <address> -- ) \ Set breakpoint in a colon word. See also 'db' command.
-				bp = parseInt(nexttoken()); inner = g.debugInner; end-code
+				bp = parseInt(nexttoken()); inner = kvm.g.debugInner; end-code
 				/// work with 'jsc' debug console, jsc is application dependent.
 code db			( -- ) \ Disable breakpoint, inner=fastInner. See also 'bp' command.
-				inner = g.fastInner end-code
+				inner = kvm.g.fastInner end-code
 				/// work with 'jsc' debug console, jsc is application dependent.
 				
 : (*debug*) 	( msg -- resume ) \ Suspend to command prompt, execute resume() to quit debugging.

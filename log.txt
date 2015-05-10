@@ -3,7 +3,7 @@
 		      A Forth programming language implementation with the 
 		    same JavaScript *kernel* for many different applications.
 			    The project focuses on the JavaScript *kernel*. 
-			            Everything else is just for DEMO.
+			            Everything else is just for DEMO and auxiliary.
 				   http://github.com/hcchengithub/project-k
 
 ---------- developping log --------------------------------------------------------------
@@ -30,7 +30,7 @@
 		jeforth.3we ~ 660 快了約 6 倍。
 	所以，先別管 inner loop 的差別了。
 	
-[ ]	"multitaskjavascripteforth" 的十一條建議：
+[x]	"multitaskjavascripteforth" 的十一條建議：
 	 1、exec(tib) 建議命名為 dictate(tib) , 英文 Dictate（吩咐）似乎像
 		在對 Forth 交代工作。hcchen5600 2015/04/27 15:18:26
 	 2、waiting 以及 resume 如何運作，需要指導。 hcchen5600 2015/04/27 15:20:02
@@ -49,7 +49,37 @@
 	11、另一種設計是： vocs = [‘forth’, ‘assembler’, ‘excel’, ‘canvas’]; words.forth[] 
 		是 forth vocabulary, 另有 words.assembler[], words.excel[], 以及 words.canvas[] 等。
 		用哪一種好，應該怎麼決定？ hcchen5600 2015/04/27 16:23:00	
+[x] project-k introduction to FigTaiwan
+	[ ] 主動用 Google polling 催請 FigTaiwan 回覆意見
+	[ ]	introduce to lang.forth after FigTaiwan approve it.
 	
+	[X] jeforth.js 的結構如下，這樣好嗎？
+		---- jeforth.js 只有三塊，如下三行 ----
+		"uses strict";
+		function jeForth(){。。。} // 定義 Forth VM constructor
+		if (typeof exports!='undefined') exports.jeForth = jeForth;	// export for Node.js APP
+		----------------------------
+	[X] Forth VM constructor 命名 KsanaVM() 請賜意見。==> jeForth()
+	[x] jeforth.js 的產出就是一個 Forth VM constructor，而非一個 instance。所
+		以 instance 可以任意命名。例如 var vm = new jeForth();
+
+	[x] 審查 jeforth.js, 引入 var g = {}; // global hash
+		這個 hash table 用來讓 Forth 的 global variables 直接與 JavaScript 互通。
+		例如 52 constant myAge 則 JavaScript g.myAge 就是 Forth myAge 的 PFA。
+		請賜意見。
+		==> 還得請示意見就表示太過頭了，直接拿掉，當成「建議」recommendation 即可。
+			有興趣的 implementation 應由 main program, say index.html, 引入 vm.g 實現。
+
+	[x]	目前這個 g structure 沒有管理機制。用著用著可能 properties 會重複、覆蓋、衝突。
+		請賜意見。
+		==> 同上，由 each implementation 各自決定。
+
+ 	[x] TIB string / #TIB pointer 的命名：
+		tib / ntib 
+		tib / itib <===== 用這個
+		或別的，這需不需要注意？請賜意見。
+
+
 		
 		
 		

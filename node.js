@@ -3,7 +3,9 @@
 // Usage: node.exe node.js cr .' Hello World!!' cr bye
 //
 
-global.kvm = require('./kernel.js').kvm;
+global.jeForth = require('./jeforth.js').jeForth;
+global.kvm = new jeForth();
+global.kvm.g = {};
 var type = kvm.type = function (s) { 
 			try {
 				var ss = s + ''; // Print-able test to avoid error 'JavaScript error on word "." : invalid data'
@@ -12,6 +14,7 @@ var type = kvm.type = function (s) {
 			}
 			process.stdout.write(ss);
 		}; 
+kvm.clearScreen = function(){console.log('\033c')} // '\033c' or '\033[2J' http://stackoverflow.com/questions/9006988/node-js-on-windows-how-to-clear-console
 kvm.fso = require('fs');
 kvm.readTextFile = function(pathname){return(kvm.fso.readFileSync(pathname,'utf-8'))}
 kvm.writeTextFile = function(pathname,data){kvm.fso.writeFileSync(pathname,data,'utf8')}
@@ -38,6 +41,6 @@ kvm.stdio = require('readline').createInterface({input: process.stdin,output: pr
 kvm.stdio.on('line', kvm.forthConsoleHandler);
 kvm.stdio.setPrompt(' '+kvm.prompt+' ',4);
 kvm.init();
-kvm.dictate(kvm.fso.readFileSync('kernel.f','utf-8'));
+kvm.dictate(kvm.fso.readFileSync('jeforth.f','utf-8'));
 // dictate() 之後不能再有任何東西，否則因為有 sleep/suspend/resume 之故，會被意外執行到。
 
