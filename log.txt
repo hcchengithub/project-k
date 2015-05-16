@@ -80,7 +80,15 @@
 		或別的，這需不需要注意？請賜意見。
 
 
-		
+[ ] root vocabulary should be root. Modify baby.html and bbt.html.
+	一改成 root 馬上感受到麻煩。因為一開始沒有 vocabulary 可用，必須用直接填的才能切換。應該還好。
+[ ] 我還是要提供 bbt.html 表示 jeForth 的能耐，最好能 demo 一下 h2o.f 更好。
+[ ] change all kvm to vm.
+[ ] remove kernel.js , kernel.f 
+[ ] 上英文社群推廣 jeforth kernel。
+[ ] textarea 稱作 jeforth.f 會引起誤會，以為是讀 file 進來的。改稱 source_code 即可。
+
+
 		
 		
 		

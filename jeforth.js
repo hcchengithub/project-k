@@ -7,8 +7,8 @@ function jeForth() {
 	var rstack = [];
 	var vocs = [];
 	var words = [];
-	var current = "forth";
-	var context = "forth";
+	var current = "root";
+	var context = "root";
 	var order = [context];
 	var wordhash = {};
 	var dictionary=[]; dictionary[0]=0;
@@ -88,11 +88,11 @@ function jeForth() {
 
 	// Get string from recent ntib down to, but not including, the next delimiter.
 	// Return {str:"string", flag:boolean}
-	// If delimiter is not found then return the entire remaining TIB, multi-lines, through result.str¡C
+	// If delimiter is not found then return the entire remaining TIB, multi-lines, through result.strã€‚
 	// result.flag indicates delimiter found or not found.
 	// o  If you want to read the entire TIB string, use nexttoken('\n|\r'). It eats the next 
 	//    white space after ntib. If use nextstring('\n|\r') then the leading white space(s) is included.
-	// o  If you need to know whether the delimiter is found, use nextstring()¡C
+	// o  If you need to know whether the delimiter is found, use nextstring()ã€‚
 	// o  result.str is "" if TIB has nothing left.
 	// o  The ending delimiter is remained. 
 	// o  The delimiter is a regular expression.
@@ -119,7 +119,7 @@ function jeForth() {
 	// o  The ending delimiter is remained. 
 	// o  The delimiter is a regular expression.
 	function nexttoken(deli){
-		if (arguments.length==0) deli='\\s';   // whitespace
+		if (arguments.length==0) deli='\\s';   // white space
 		if (deli=='\\s') skipWhiteSpaces(); else ntib += 1; // Doesn't matter if already at end of TIB. 
 		var token = nextstring(deli).str;
 		return token; 
@@ -133,7 +133,7 @@ function jeForth() {
 		}
 	}
 	
-	// tick() is same thing as forth word '¡C 
+	// tick() is same thing as forth word 'ã€‚ 
 	// Let words[voc][0]=0 also means tick() return 0 indicates "not found".
 	// Return the word obj of the given name or 0 if the word is not found.
 	function tick(name) {
@@ -156,7 +156,7 @@ function jeForth() {
 	}
 	
 	// comma(x) compiles anything into dictionary[here]. x can be number, string, 
-	// function, object, array .. etc¡C
+	// function, object, array .. etcã€‚
 	// To compile a word, comma(tick('word-name'))
 	function comma(x) {
 		dictionary[here++] = x;
@@ -165,47 +165,51 @@ function jeForth() {
 		// RET is the ending mark for 'see' to know where to stop. 
 	}
 	
-	// °Q½×¤@¤U¡G
-	// jeforth ¸Ì address »P ip ³Ì«á³£®³¨Ó·í dictionary[] ªº index ¥Î¡C address ©Î ip ¨ä¹ê
-	// ¬O dictionary[] ªº index¡C
-	
-	// §â©Ò¦³¤£¦Pª©¥»ªº call() dolist() execute() runcolon() runFunc() µ¥µ¥³£¾ã¦X¦¨ execute(w)
-	// ©Î inner(entry), «eªÌ¥u°õ¦æ¤@­Ó word, «áªÌªuµÛ ip Ä~Äò¶]. The w can be word
-	// object, word name, a function; while entry is an address¡C
-	
-	// execute() Ãþ¦ü CPU instruction ªº single step, ¦Ó inner() Ãþ¦ü CPU ªº call «ü¥O¡C
-	// ·|¥Î ¨ì inner() ªº¦³ outer() ¥H¤Î colon word ªº xt(), ¦Ó execute() «h¨ì³B¦³¥Î¡C 
-	
-	// ±q code word ¸Ì call forth word ªº¤èªk¦³ execute('word') »P dictate('word word word')
-	// ¥[¤W inner(cfa) ¤TºØ¤èªk¥i¨Ñ¿ï¾Ü¡Cdictate() ¼È®É§Ã¶}¤@¼h outer loop, ©ó¨ä¤¤
-	// ¥u¬Ý¨ìÁ{®Éªº TIB ¤]´N¬O dictate() ªº input string¡C
+	// Discussions:
 
-	// ³Ì²×·¥ªº inner loop ¬O¥Ñ while(w){ip++; w.xt(); w=dictionary[ip]}; ¥H¤Î return ®Éªº
-	// ip=rstack.pop(); ²Õ¦¨¡C¥u­n¥Î¨ã¦³ false ÅÞ¿èÄÝ©ÊªºªF¦è¨Ó·í ret ¥H¤Î exit ´N¥i¥Hº¡¨¬¡C
-	// ¦@¦³ null, "", false, NaN, undefined, and 0 ¤»ºØ¥i¨Ñ¿ï¾Ü¡C¥ô¿ï RET=null, EXIT=""¡C
+	// 'address' or 'ip' are index of dictionary[] array. dictionary[] is the memory of the
+	// Forth virtual machine.
+	
+	// execute() executes a function, a word "name", and a word Object.  
 
-	// Suspend VM ®É¡A­n¤¤¤î©Ò¦³ªº inner loop ¦ý¤£ pop return stack ¥H«Ý resume ®É«ì´_°õ¦æ¡C
-	// dictionary[0] ¥H¤Î words[<vid>][0] ³£©T©w©ñ 0, ´N¬O­n³y¦¨ ip=w=0 ¥Nªí³o±¡§Î¡C±q outer 
-	// loop ­è¶i¤J inner loop ¤§®É­n¥ý push(0) ¶i return stack ¦p¦¹¬J balance return stack ¤S
-	// Åý 0 ¨Ó§êºt³o­Ó¯S®í¥Øªº¡C·í inner loop ¦b unbalanced ªº±¡ªp¤U¼²¨ì ip=rstack.pop(); where
-	// ip is 0 §Y¶i¤J suspend µ{§Ç¡A«O¯d³Ñ¤Uªº unbalanced rstack ¨Ñ debug °Ñ¦Ò¡C
+	// inner(entry) jumps into the entry address. The TOS of return stack can be 0, in that
+	// case the control will return back to JavaScript host, or the return address.
+
+	// inner() used in outer(), and colon word's xt() while execute() is used everywhere.
+	
+	// We have 3 ways to call forth words from JavaScript: 1. execute('word'), 
+	// 2. dictate('word word word'), and 3. inner(cfa). 
+
+	// dictate() cycles are stand alone tasks. We can suspend an in-completed dictate() and we
+	// can also run another dictate() within a dictate().
+
+	// The ultimate inner loop is like this: while(w){ip++; w.xt(); w=dictionary[ip]}; 
+	// Boolean(w) == false is the break condition. So I choose null to be the RET instruction
+	// and the empty string "" to be the EXIT instruction. Choices are null, "", false, NaN, 
+	// undefined, and 0. Total 6 of them. 0 has another meaning explained below.
+
+	// To suspend the Forth virtual machine means to stop inner loop but not pop the 
+	// return stack, resume is possible because return stack remained. We need an instruction 
+	// to do this and it's 0. dictionary[0] and words[<vid>][0] are always 0 thus ip=w=0 
+	// indicates that case. Calling inner loop from outer loop needs to push(0) first so 
+	// as to balance the return stack also letting the 0 instruction to stop popping the
+	// return stack because there's no more return address, it's outer interpreter remember? 
 	
 	// -------------------- ###### The inner loop ###### -------------------------------------
 
-	// ¾ã²z¦UºØ¤£¦PºØÃþªº entry Â½Ä¶¦¨«ê·íªº w. 
-	// phaseA() ¤£¦b major inner() loop ¸Ì, ¤£©Èªá®É¶¡¡C
+	// Translate all possible entry or input to the suitable word type.
 	function phaseA (entry) { 
 		var w = 0; 
 		switch(typeof(entry)){
 			case "string": // "string" is word name
-				w = tick(entry.replace(/(^( |\t)*)|(( |\t)*$)/g,'')); // remove ÀY§À whitespaces
+				w = tick(entry.replace(/(^( |\t)*)|(( |\t)*$)/g,'')); // remove leading and tailing white spaces
 				break;
 			case "function": case "object": // object is a word
 				w = entry; 
 				break;
 			case "number": 
 				// number could be dictionary entry or 0. 
-				// ¥i¯à¬O does> branch ªº entry ©Î ret exit rstack pop ¥X¨Óªº¡C
+				// could be does> branch entry or popped from return stack by RET or EXIT instruction.
 				ip = entry;
 				w = dictionary[ip]; 
 				break;
@@ -215,21 +219,20 @@ function jeForth() {
 		return w;
 	}
 
-	// °w¹ï¤£¦PºØÃþªº w ±Ä¨ú¥¿½T¤è¦¡°õ¦æ¥¦¡C
+	// Execute the given w by the correct method 
 	function phaseB (w) { 
 		switch(typeof(w)){
 			case "number":  
-				// ¬Ý¨ì number ³q±`¬O does> ªº entry, 
-				// ¤£¯à¥Î inner() ¥h call¡A §_«h·|¬O­Ó¤£©öµo²{ªº bug!!
-				// ¥H¤U¥Î push-jump ¼ÒÀÀ call instruction.
-				rstack.push(ip); // Forth ªº ip ¬O¡u¤U¤@­Ó¡v­n°õ¦æªº«ü¥O¡A¥ç§Y return address.
-				ip = w; // jump
+				// Usually a number is the entry of does>. Can't use inner() to call it 
+				// The below push-jump mimics the call instruction of a CPU.
+				rstack.push(ip); // Forth ip is the "next" instruction to be executed.
+				ip = w; // jump , 
 				break;
 			case "function": 
 				w();
 				break;
 			case "object": // Word object
-				try { // ¦Û¤v³B²z JavaScript errors ¥H§K°Ê¤£°Ê´N³Q¥Ï¥X¥h.
+				try { // take care of JavaScript errors to avoid being kicked out very easily
 					w.xt();
 				} catch(err) {
 					panic('JavaScript error on word "'+w.name+'" : '+err.message+'\n',"error");
@@ -249,17 +252,17 @@ function jeForth() {
 	}
 
 	function inner (entry, resuming) {
-		var w = phaseA(entry); // Â½Ä¶¦¨«ê·íªº w.
+		var w = phaseA(entry);
 		do{
 			while(w) {
-				ip++; // Forth ªº³q¨Ò¡Ainner loop ·Ç³Æ execute ³o­Ó word ¤§«e¡AIP ¥ý«ü¨ì¤U¤@­Ó word.
-				phaseB(w); // °w¹ï¤£¦PºØÃþªº w ±Ä¨ú¥¿½T¤è¦¡°õ¦æ¥¦¡C
+				ip++; // Forth general rule. IP points to the *next* word. 
+				phaseB(w);
 				w = dictionary[ip];
 			}
-			if(w===0) break; // w==0 is suspend, break inner loop but reserve rstack. Inner loop ¥¼§¹¥b³~Â÷¶}¡C
-			else ip = rstack.pop(); // w is either ret(NULL) or exit(""). ·Ç³Æ return ¤F¡C
-			if(resuming) w = dictionary[ip]; // ¥¿±`ªº¤W¼h inner() ³£¤w¸g³Q suspend µ²§ô±¼¤F¡Aresume ­n¦Û¤v¸É¦ì¡C
-		} while(ip && resuming); // Resuming inner loop. ip==0 means resuming has done¡C
+			if(w===0) break; // w==0 is suspend, break inner loop but reserve rstack.
+			else ip = rstack.pop(); // w is either ret(NULL) or exit(""), return to caller.
+			if(resuming) w = dictionary[ip]; // Higher level of inner()'s have been terminated by suspend, do their job.
+		} while(ip && resuming); // Resuming inner loop. ip==0 means resuming has doneã€‚
 	}
 	// ### End of the inner loop ###
 
@@ -273,10 +276,10 @@ function jeForth() {
 		if (entry) inner(entry, true); // resume from the breakpoint 
 		while(!stop) {
 			var token=nexttoken();
-			if (token==="") break;    // TIB ¦¬§¹¤F¡A loop ¥X¤f¦b³o¸Ì¡C
+			if (token==="") break;    // TIB done, loop exit.
 			outerExecute(token);
 		}
-		// ³æ³B²z¤@­Ó token. 
+		// Handle one token. 
 		function outerExecute(token){
 			var w = tick(token);   // not found is 0. w is an Word object.
 			if (w) {
@@ -294,11 +297,11 @@ function jeForth() {
 							panic("Error! "+token+" is interpret-only.\n", tib.length-ntib>100);
 							return;
 						}
-						comma(w); // ±N w ½s¤J dictionary. w is a Word() object
+						comma(w); // compile w into dictionary. w is a Word() object
 					}
 				}
 			} else if (isNaN(token)) {
-				// parseInt('123abc') ªºµ²ªG¬O 123 «Ü¦MÀI! ©Ò¥H«e­±­n¥Î isNaN() ¥ýÀËÅç¡C		
+				// parseInt('123abc') is 123, very wrong! Need to check in prior by isNaN().
 				panic("Error! "+token+" unknown.\n", tib.length-ntib>100);
 				return;
 			} else {
@@ -319,11 +322,12 @@ function jeForth() {
 	// keyboard input is difficult to me on an event-driven or a non-blocking 
 	// environment like Node-webkit.
 	function docode() {
-	    // ±N¨Ó©Ò¦³ªº code words ³£·|»{±o³o¸Ìªº local variables ©Ò¥H³o¸Ì­±­nÁ×§K
-		// ¥Î¨ì¥ô¦ó local variable¡C ¥~­±ªº vm global variables & functions ·íµM³£»{±o¡C
+	    // All future code words can see local variables in here, so don't use
+		// any local variable. They can *see* variables & functions out side 
+		// this function too, that's normal.
 		compiling = "code"; // it's true and a clue of compiling a code word.
 		newname = nexttoken();
-		if(isReDef(newname)) type("reDef "+newname+"\n"); 	// ­Y¥Î tick(newname) ´N¿ù¤F
+		if(isReDef(newname)) type("reDef "+newname+"\n"); 	// don't use tick(newname), it's wrong.
 		push(nextstring("end-code")); 
 		if(tos().flag){
 			eval(
@@ -337,12 +341,12 @@ function jeForth() {
 	}
 	
 	words[current] = [
-		0,  // ¥O current_word_list()[0] == 0 ¦³«Ü¦h¦n³B¡A·í tick() 
-			// ¶Ç¦^ 0 ®É current_word_list()[0] ¥¿¦n¬O 0, ª½±µ·N¿×¥¢±Ñ¡Ctick ' ªº©w¸q¤]Â²³æ¡C
+		0,  // Letting current_word_list()[0] == 0 has many advantages. When tick('name') 
+			// returns a 0, current_word_list()[0] is 0 too, indicates a not-found.
 		new Word([
 			"code",
 			docode,
-			"this.vid='forth'",
+			"this.vid='root'",
 			"this.wid=1",
 			"this.type='code'",
 			"this.help='( <name> -- ) Start composing a code word.'",
@@ -360,7 +364,7 @@ function jeForth() {
 				wordhash[last().name]=last();
 				compiling  = false;
 			},
-			"this.vid='forth'",
+			"this.vid='root'",
 			"this.wid=2",
 			"this.type='code'",
 			"this.immediate=true",
@@ -369,7 +373,7 @@ function jeForth() {
 		])
 	];
 	
-	// ¥Î JavaScript ªº¤Q¦¨¥\¤O¨Ó§ä word¡C
+	// Use the best of JavaScript to find a word.
 	wordhash = {"code":current_word_list()[1], "end-code":current_word_list()[2]};
 	
 	// -------------------- main() ----------------------------------------
@@ -381,7 +385,7 @@ function jeForth() {
 		var tibwas=tib, ntibwas=ntib, ipwas=ip;
 		tib = input; 
 		ntib = 0;
-		stop = false; // stop ¬Oµ¹ outer loop ¬Ýªº¡A³o¸Ì­n¥ý²M°£¡C
+		stop = false; // stop outer loop
 		outer();
 		tib = tibwas;
 		ntib = ntibwas;
@@ -458,7 +462,7 @@ function jeForth() {
 	// js> mytypeof({})           \ ==> object (string)
 	// js> mytypeof(null)         \ ==> null (string)  
 
-	vm.stack = function(){return(stack)}; // debug easier. stack ±`³Q§ï¡A¯d¦b vm ¸Ì¥i¯à¬OÂÂª©¡A©Ò¥H­nÀH®É±q¨{¤l¸Ì§ì¡C
+	vm.stack = function(){return(stack)}; // debug easier. stack got manipulated often, need a fresh grab.
 	vm.rstack = function(){return(rstack)}; // debug easier especially debugging TSR
 	vm.words = words; // debug easier
 	vm.dictionary = dictionary; // debug easier

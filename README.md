@@ -1,9 +1,40 @@
-project-k
-========
+A minimized jeForth kernel
+==========================
+#en
+A very simple way to develop your own Forth system on Web page, HTA, Node.js, Node-Webkit, Windows DOS box, and anywhere JavaScript is available. jeforth.js is the only file in this project. The below two lines is a demo to use it to generate a Forth VM on your web page in HTML:
 
-¾ã²z FigTaiwan ¥Î JavaScript ¼g¦¨ªº Forth VM, ¥u±Mª`¦b kernel.js ¨Ï¥¦¯à¦b©Ò¦³ªº application ¡]HTML, Node.js, Node-webkit, WSH, HTA, µ¥¡^³q¥Î¡C³o·|¨Ï±o kernel.js §óºëÂ²¡B©öÀ´¡C§Y¨Ï¦p¦¹¡A¥Ñª©Åvªº¿ï¾Ü¡B¨ìµ²ºcªº³]­p¡B¨ì¨C¤@¶µ©R¦W¡A¬Ò»Ý¼s¼x·N¨£¡C
+    <script src="./jeforth.js"></script>
+    <script> window.vm = new jeForth(); </script>
 
-»¡©ú½Zª½±µ©ñ¦b GitHub > project-k > Wiki ¨Ñ°Ñ»PªÌ½s¿è¡C¤]¥i¥H³z¹L GitHub > project-k > issues °lÂÜ°Q½×³æ¶µ°ÝÃD¡C
+Now we have an object 'vm' which is the Forth virtual machine that has only two initial Forth words 'coce' and 'end-code'. Use the two words to create your own entire Forth system then. 
+
+#demo
+baby.html is a simple complete demo. Use Google Chrome to run it.
+
+#how to include 
+
+**a.** For HTML, HTA, and Node-webkit:
+
+    <script src="./jeforth.js"></script>
+    <script> window.vm = new jeForth(); </script>
+
+**b.** For Node.js and Node-webkit:
+
+    global.vm = require("./jeforth.js").jeForth;
+    global.vm = new jeForth();
+
+**c.** For WSH:
+
+    eval(readTextFile(".\\jeforth.js"));
+    vm = new jeForth();
+
+jeForth was first invented by FigTaiwan Mr. Yap and Sam Suan Chen during end of 2011. Any suggestion or question, use the 'issues' and 'wiki' on this GitHub repository or email me at hcchen5600@gmail.com. 
+
+Happy programming !
+
+#tw
+æ•´ç† FigTaiwan ç”¨ JavaScript å¯«æˆçš„ Forth VM, åªå°ˆæ³¨åœ¨ kernel ä½¿å®ƒèƒ½åœ¨æ‰€æœ‰çš„ application ï¼ˆHTML, Node.js, Node-webkit, WSH, HTAï¼‰é€šç”¨ã€‚é€™æœƒä½¿å¾— kernel æ›´ç²¾ç°¡ã€æ˜“æ‡‚ã€‚èªªæ˜Žç¨¿ç›´æŽ¥æ”¾åœ¨ GitHub > project-k > Wiki ä¾›åƒèˆ‡è€…ç·¨è¼¯ã€‚ä¹Ÿå¯ä»¥é€éŽ GitHub > project-k > issues è¿½è¹¤è¨Žè«–å–®é …å•é¡Œã€‚
+
 
 > Written with [StackEdit](https://stackedit.io/).
 
