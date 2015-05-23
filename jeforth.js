@@ -24,8 +24,8 @@ function jeForth() {
 	var newhelp = "";
 	var type = function(){}; // dummy 
 
-	vm.init = function () { 
-		type = vm.type;
+	vm.init = function (f) { 
+		type = f;
 	}
 	
 	function Word(a) {
@@ -250,6 +250,7 @@ function jeForth() {
 			else phaseB(w); 
 		}
 	}
+	vm.execute = execute;
 
 	function inner (entry, resuming) {
 		var w = phaseA(entry);

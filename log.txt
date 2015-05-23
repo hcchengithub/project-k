@@ -80,17 +80,45 @@
 		或別的，這需不需要注意？請賜意見。
 
 
-[ ] root vocabulary should be root. Modify baby.html and bbt.html.
+[x] root vocabulary should be root. Modify baby.html and bbt.html.
 	一改成 root 馬上感受到麻煩。因為一開始沒有 vocabulary 可用，必須用直接填的才能切換。應該還好。
-[ ] 我還是要提供 bbt.html 表示 jeForth 的能耐，最好能 demo 一下 h2o.f 更好。
-[ ] change all kvm to vm.
-[ ] remove kernel.js , kernel.f 
+[x] 我還是要提供 bbt.html 表示 jeForth 的能耐，最好能 demo 一下 h2o.f 更好。
+	==> No. 只提供 baby.html，要完整的 forth 系統直接介紹 jeforth.3we。
+[x] change all kvm to vm.
+[x] remove kernel.js , kernel.f 
 [ ] 上英文社群推廣 jeforth kernel。
-[ ] textarea 稱作 jeforth.f 會引起誤會，以為是讀 file 進來的。改稱 source_code 即可。
+[x] textarea 稱作 jeforth.f 會引起誤會，以為是讀 file 進來的。改稱 source_code 即可。
 
 
+[x] 報告進度  hcchen5600 2015/05/17 06:22:45 
+
+	> 要把 JeForth 包裝，註解，範例，一樣一樣的做好
+
+	整個 project 只有一個檔案： 20k 不到的 jeforth.js，已經做好了。含 GitHub 必
+	須的 README.md, 範例 baby.html 也完成。這是一個超小的小 project. 我覺得
+	既小就讓它一次小個夠，以收令人一看便覺得「還有半小時，不妨看一看」的鼓
+	勵效果。
+
+	> 而且 Node.js 與 React.js 的融入，都是促進 JeForth 熟化的必然要素
+
+	我心目中的這個 jeForth kernel 嚴守 kernel 的本分，不多做任何一丁點。也就
+	是把一切應用交給 user, 連 dup swap if else then 等都屬應用層面。也就是只
+	照顧 code end-code 以及少數必要的公用 functions (i.e. pop(), push(), last() 等) , 
+	properties (i.e. words[][], dictionary[], stack[], rstack[] 等) 此外無他。
+
+	Node.js 是咱的 host 之一，本 kernel 企圖 porting 到所有的 JavaScript host 故必
+	須能支援，也已經可以支援。我還不知道 react.js，如果是應用層我不管，如果也
+	是個 JavaScript host 則同樣必須支援。
+
+	以上報告。
+
+	請上 GitHub > project-k 整包 zip 抓下來，直接在 local computer 執行 baby.html 欣
+	賞該 demo。查看 jeforth.js 看短短的程式架構、註解、變數取名、function 取名等
+	好不好懂，並請賜教。
 		
-		
-		
-		
+[ ] 錯了！ kernel 怎知自己叫作 vm ??????? init() 要改。
+	> vm.init.toString()
+	'function () { \r\n\t\ttype = vm.type;\r\n\t}'		
+	[x] baby.html  [x] node.js  [ ] bbt.html 	
+	==> 其實沒錯，因為 jeforth.js 裡面看到的 vm 就是自己。不是外面那個 vm instance.	
 		

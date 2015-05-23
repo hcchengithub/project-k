@@ -48,7 +48,7 @@
         jQuery(document).ready(
             function() {
                 document.onkeydown = hotKeyHandler; // Must be using onkeydown so as to grab the control.
-                vm.init(); // Introduce I/O to Forth VM
+                vm.init(type); // Introduce I/O to Forth VM
                 // vm.dictate() is the only Forth command interface.
                 // Send a command line string, or an entire source code file into the Forth VM through
                 // this interface.
