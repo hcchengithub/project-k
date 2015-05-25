@@ -16,7 +16,12 @@ jeforth.js is the only file in this project. The below two lines generate a Fort
 
 Now we have an object 'vm' which is the Forth virtual machine that has only two Forth words 'coce' and 'end-code'. Use the two words to create your own entire Forth system then. 
 
-#how to include 
+#tutorials and documents
+Find tutorials and documents in [the wiki](https://github.com/hcchengithub/project-k/wiki).
+
+#quick reference
+
+Get the jeforth VM start and running,
 
 **a.** For HTML, HTA, and Node-webkit:
 
@@ -35,13 +40,13 @@ Now we have an object 'vm' which is the Forth virtual machine that has only two 
     /* readTextFile() is not cscript.exe built-in, you need to write it */
 
 #real thing
-[jeforth.3we](http://github.com/hcchengithub/jeforth.3we) is this project's predecessor that has complete developed. We can use it to do real things. Many Forth users rather to develop their own system than to use an existing one. Further more, I believe to develop a Forth system for your own use is the bast way to learn it. 
+[jeforth.3we](http://github.com/hcchengithub/jeforth.3we) is this project's predecessor that has developed completely. You can use it to do real things. The bast way to learn Forth is to create your own Forth. So I rejuvenate jeforth.3we back to it's kernel, the jeforth.js source code, for people to develop their own Forth system from a higher starting point.
 
 #participation
 
-Any suggestion or question, use the 'issues' and 'wiki' on this GitHub repository or email me at hcchen5600@gmail.com. 
+Any suggestion or question, use the 'issues' and 'wiki' on this GitHub repository, raise them to [the FigTaiwan forum](https://groups.google.com/forum/?hl=zh-TW#!forum/figtaiwan) or email me at hcchen5600@gmail.com. 
 
-Happy programming !
+###Happy programming !
 
 #tw
 整理 FigTaiwan 用 JavaScript 寫成的 Forth VM, 只專注在 kernel 使它能在所有的 application （HTML, Node.js, Node-webkit, WSH, HTA）通用。這會使得 kernel 更精簡、易懂。說明稿直接放在 GitHub > project-k > Wiki 供參與者編輯。也可以透過 GitHub > project-k > issues 追蹤討論單項問題。
