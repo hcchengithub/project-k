@@ -425,6 +425,7 @@ function jeForth() {
 	}
 
 	// Stack access easier. e.g. pop(1) gets tos(1) and leaves ( tos(2) tos(1) tos(void|0) -- tos(2) tos(void|0) )
+	// push(formula(pop(i)),i-1) manipulate the tos(i) directly, usually when i is the index of a loop.
 	function pop(index) {	
 		switch (arguments.length) {
 			case 0  : return stack.pop();
@@ -433,6 +434,7 @@ function jeForth() {
 	}
 
 	// Stack access easier. e.g. push(data,1) inserts data to tos(1), ( tos2 tos1 tos -- tos2 tos1 data tos )
+	// push(formula(pop(i)),i-1) manipulate the tos(i) directly, usually when i is the index of a loop.
 	function push(data, index) { 
 		switch (arguments.length) {
 			case 0  : 	panic(" push() what?\n");

@@ -21,7 +21,7 @@ Find tutorials and documents in [the wiki](https://github.com/hcchengithub/proje
 
 #quick reference
 
-Get the jeforth VM start and running,
+Get the jeforth VM up and running,
 
 **a.** For HTML, HTA, and Node-webkit:
 
