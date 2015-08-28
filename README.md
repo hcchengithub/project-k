@@ -7,7 +7,9 @@ A minimum Forth kernel
 jeForth was first invented by FigTaiwan Mr. Yap and Sam Suan Chen during end of 2011. It's a very simple way to develop your own Forth system anywhere JavaScript is available -- Web page, HTA, Node.js, Node-Webkit, and Windows DOS box. 
 
 #demo
-baby.html is a simple demo. Use Google Chrome to run it.
+Sample program baby.html is a very simple demo. 
+Sample program cub.html has most forth words. 
+Use Google Chrome to run them.
 
 jeforth.js is the only file in this project. The below two lines generate a Forth Virtual Machine on your web page in HTML:
 

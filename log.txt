@@ -116,9 +116,19 @@
 	賞該 demo。查看 jeforth.js 看短短的程式架構、註解、變數取名、function 取名等
 	好不好懂，並請賜教。
 		
-[ ] 錯了！ kernel 怎知自己叫作 vm ??????? init() 要改。
+[x] baby.html 中扯進 jquery 有違盡量簡單的目標。但是不用 jquery 則 
+		$('#outputbox').append(plain(ss));
+	改寫起來就會很麻煩。
+	<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>	
+	
+[x] 錯了！ kernel 怎知自己叫作 vm ??????? init() 要改。
 	> vm.init.toString()
 	'function () { \r\n\t\ttype = vm.type;\r\n\t}'		
 	[x] baby.html  [x] node.js  [ ] bbt.html 	
 	==> 其實沒錯，因為 jeforth.js 裡面看到的 vm 就是自己。不是外面那個 vm instance.	
-		
+
+[x] 準備回應爽哥要求 jeforth.html 改寫中, 
+	[x] jsc 還有問題, drop it
+	[x] sample code baby.html , cub.html ... done
+
+	

@@ -1,6 +1,6 @@
 "uses strict";
 function jeForth() {     
-	var vm = this;
+	var vm = this; // "vm" 就是 jeforth 自己。
 	var ip=0;
 	var stack = [] ;
 	var stackwas = []; // Definition of : ... ; needs a temp storage.
@@ -23,11 +23,9 @@ function jeForth() {
 	var newxt = function(){}; // new word's function()
 	var newhelp = "";
 	var type = function(){}; // dummy 
-
 	vm.init = function (f) { 
 		type = f;
 	}
-	
 	function Word(a) {
 		this.name = a.shift();  // name and xt are mandatory
 		this.xt = a.shift();
@@ -467,7 +465,7 @@ function jeForth() {
 
 	vm.stack = function(){return(stack)}; // debug easier. stack got manipulated often, need a fresh grab.
 	vm.rstack = function(){return(rstack)}; // debug easier especially debugging TSR
-	vm.words = words; // debug easier
+	vm.words = words; // debug easier. works.root is the root vocabulary or word-list
 	vm.dictionary = dictionary; // debug easier
 }
 if (typeof exports!='undefined') exports.jeForth = jeForth;	// export for node.js APP
