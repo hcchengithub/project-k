@@ -131,4 +131,106 @@
 	[x] jsc 還有問題, drop it
 	[x] sample code baby.html , cub.html ... done
 
+[x] cub.f 直接在 jeforth.3we 裡試驗 project-k-kernel 很成功。一下就把 cub.f
+	run 起來了。cub.f 沒有 selftest 所以不可靠, jeforth.3we 穩是基本要求。準備
+	改用 3we/kernel/jeforth.f 
+[x] 用了很久的 packhelp() 傳回 "( foo ) bar" 或者 "( ?? ) No help message. Use // to add one."
+	等於是從 tib 抽 help 出來。用新的 "parse-help" 取代，方法如下：
+		push(nexttoken('\n|\r')); // rest of the first line
+		execute("parse-help"); // ( "helpmsg" "rests" )
+		tib = pop() + " " + tib.slice(ntib); ntib = 0; // "rests" + tib(ntib)
+		newhelp = pop();
+[x] project-k 的 panic 要表明身分,否則搞搞不清楚.
+		
+[x] 從 jeforth.3we 下命令給 project-k VM 用 hotkey f8：--> cub.f
+[x] cub.f 好了,攻 selftest, 改良。
+[x] Original (words) in jeforth.f is very powerful but without -v and -V. 
+	While words and help was poor, because they were rely on voc.f unnecessarily.
+	So we need to improve words and help. --> 規定好 input 格式, 有助化簡程式。
+	words/help [pattern [switch [argument]]]
+[x] 老經驗
+	nexttoken('\n|\r'); // if use only '\n' then we get an unexpected ending '\r'.	
+[x] see ~(create)~
+	JavaScript error on word ".0r" : Cannot read property 'length' of undefined
+	==> RI,FP: 產生一個 colon word 方法很多，不一定已經有 cfa。  
+[x] 用 vm.init() 來設定 type() or print() function 多此一舉。已經有 vm.clearScreen 等
+	乾脆就不要 init() 了。projct-k 根本不知道也不用知道你需要 print() !!
+	==> jeforth.js 有用到 type() 這樣一來 project-k 就認為自己在有 display 的地方執行?!
+		雖然可以從 type() 的定義解決，總是不太理想。
+	==> 用到 type() 的地方
+		1. docode() 的 reDef warning ==> 改 call panic(state-object). 
+		2. panic() ==> 所有 error/warning 都 call panic() 如前。但 panic() 裡面先檢查有
+		   沒有 vm.panic() 然後 call vm.panic(state)。
+		3. reset() 的 message 沒啥意義
+	==> 已經都用 k :: type=function..., k :: prompt=.. 的方式。
+[x] Javascript 的 string 有 trim() method 可以去頭尾 white spaces, 從來不知。
+[x]	stackwas 放在 jeforth.js kernel 裏頭有必要嗎? --> 改成 tick(':').stackwas 了。
+[x] 要參考 code word 自身,用 tick('name') 是可以考慮。有更好的辦法嗎?
+	==> 現在 _me 直接就是該 word object 本身。
+[x] working on db bp *debug* for cub.f
+	==> resume function needs a static variable.
+		--> see processing.f, "JavaScript Module Pattern: In-Depth" in YouDao Notebook.
+	==> I only want to get the code word object	in its xt(), it's the argument! So,
+		simply call w.xt(w) passes w over, this simple! This is done in the inner().
+		also "newxt=function(_me){..." in docode() of kernel jeforth.js.
+	==> 經由 "newxt=function(_me){..." in docode() of kernel jeforth.js, and
+		simply call w.xt(w) in the inner() loop, we have _me in any code word
+		that indicates the code word itself.
+[x]	root word-list 還是叫 'forth' 好了, 當初想的是讓 project-k 盡量中性，先有 root 然
+	後再加上 forth voc 等。但因為 kernel jeforth.f 本身不 support vocabulary, 故以上
+	已經落空，根本分不出 root 跟 forth 不如就用 forth。還是可以在 voc.f 進來了以後再
+	拆分 root 跟 forth。但這麼做有何意義? 既無意義就表示都是 forth 即可。
+	所以 forth 變成永遠都在的部分，不想讓 words help 太雜亂時，盡量用 only work.f,
+	only git.f 等來讓輸出清爽。故 words 的 -v -V -V- option 都不必了，好耶。
+[x] should be moved to voc.f
+	source-code-header ( -- ) \ The source-code-file.f header macro 
+[x] cub.f 寫好了以後要併回 cub.html, project-k 保持單純。
+[x] 大改寫, 
+	[x] voc.f help calls (help) but origianl (help)/help 的 系統 help 要重新調配. 
+		(help) 不該負責印系統 help --> (words) words , voc.f words help ok
+	o	所有 g.sth 改成 vm.g.sth
+	o	fortheval --> dictate
+	o	print --> type 
+	o	kvm --> vm
+[x] jeforth.3we 的 'kernel' directory 直接就是 project-k 以免搞不清楚.
+	本來認為是 kernel 的 jeforth.f 跟 voc.f 則搬到 f 裡去。不當作 kernel 了。
+	[x]	這個要把 kernel 拿掉, 以 3htm 為例,
+		kvm.path = ["dummy","f", "3htm/f", "3htm/canvas", "3htm", "playground"];
+[x]	這兩個不必佔用 vm.member , 應該直接放進 *debug* 的 members。
+	因為掛在 vm 下的 properties 都要有關聯 vm 內外的目的，如 vm.type(), vm.prompt, 
+	等. bp 跟 continue 或 resume 純粹是 jeforth.f 內部的東西, 應該屬於 value 放
+	在 vm.g 下才對. 宣告成 value 就對了。
+		// debug
+		vm.bp = 0 // breakpoint  <---- tick("*debug*").breakpoint=0
+		vm.continue = 0 // *debug* resume point   <---- tick("*debug*").resume=null
+	[x] index.html [x] cub.html [ ] 3nw [ ] 3nd 
 	
+[x] some application didn't use this trick
+		e = (e) ? e : event; var keycode = (e.keyCode) ? e.keyCode : (e.which) ? e.which : false;
+	[x] index.html of 3HTML, [x] baby.html of project-k, [x] cub.html of project-k
+[x] chrome f12 跑出一個 message : 
+	cub.html:6 Resource interpreted as Stylesheet but transferred with MIME type text/plain: "http://localhost:8888/common.css".
+	我不喜歡這個解釋 http://stackoverflow.com/questions/12003107/resource-interpreted-as-script-but-transferred-with-mime-type-text-plain-for-l
+	用 Win8 ie10 也一樣有問題 SEC7113: CSS was ignored due to mime type mismatch 
+	--> utf-8 改成 ANSI 也沒用
+	==> 改直接執行 cub.html 就好了 (不透過 localhost:8888) --> 可能是 webserver.f 的問題.
+	==> 果然是 webserver.f 的問題! https://msdn.microsoft.com/en-us/library/hh180764(v=vs.85).aspx
+		RI : An imported style sheet was not used due to the wrong MIME type in the HTTP header.
+		FP : Ensure style sheet file is delivered with the proper HTTP response header, which includes 
+		     a content type of text\css. See MIME-Handling Changes in Internet Explorer for more information.
+[x]	ie10 還抓到 cub.html 好多別的問題
+	HTML1402: Character reference is missing an ending semicolon ";". 
+	cub.html, line 243 character 22
+	HTML1402: Character reference is missing an ending semicolon ";". 
+	cub.html, line 707 character 62
+	HTML1402: Character reference is missing an ending semicolon ";". 
+	cub.html, line 707 character 124
+	HTML1402: Character reference is missing an ending semicolon ";". 
+	cub.html, line 710 character 34
+	HTML1402: Character reference is missing an ending semicolon ";". 
+	cub.html, line 712 character 103
+	在 chrome 都沒問題,而且所列之處根本就是 forth code ! 別管他。
+[x] 3htm jsc 裡 erase 無效 ... 感謝我自己! 以前已經發現在 jsc console 時
+	inputbox.value 是 \10 因為 \r\n 只吃掉 \r 故留下 \n 使得 inputbox 非 empty 因此
+	{backspace} 不工作。修改判斷條件為 inputbox.value==""||inputbox.value=="\n" 即可
+[ ] tweak cub.html on going . . . so as to make a project-k release

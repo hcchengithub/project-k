@@ -1,14 +1,14 @@
 "uses strict";
 function jeForth() {     
-	var vm = this; // "vm" 就是 jeforth 自己。
+	var vm = this;
+	vm.major_version = 2; // major version, jeforth.js kernel version.
 	var ip=0;
 	var stack = [] ;
-	var stackwas = []; // Definition of : ... ; needs a temp storage.
 	var rstack = [];
 	var vocs = [];
 	var words = [];
-	var current = "root";
-	var context = "root";
+	var current = "forth";
+	var context = "forth";
 	var order = [context];
 	var wordhash = {};
 	var dictionary=[]; dictionary[0]=0;
@@ -22,10 +22,34 @@ function jeForth() {
 	var newname = ""; // new word's name
 	var newxt = function(){}; // new word's function()
 	var newhelp = "";
-	var type = function(){}; // dummy 
-	vm.init = function (f) { 
-		type = f;
+	
+	// Call out vm.type()
+	function type(s) {
+		if(vm.type) vm.type(s);
 	}
+	
+	// Reset the forth VM
+	function reset(){
+		rstack = [];
+		compiling=false;
+		ip=0; // forth VM instruction pointer
+		stop = true; 
+		ntib = tib.length; // don't clear tib, a clue for debug.
+		// stack = []; I guess it's a clue for debug
+	}
+
+	// Call out vm.panic()
+	function panic(msg,level) {
+		var state = {
+				msg:msg, level:level
+				// , compiling:compiling, 
+				// stack:stack.slice(0), rstack:rstack.slice(0), 
+				// ip:ip, tib:tib, ntib:ntib, stop:stop
+			};
+		if(vm.panic) vm.panic(state);
+	}
+
+	// Forth words are instances of Word() constructor.
 	function Word(a) {
 		this.name = a.shift();  // name and xt are mandatory
 		this.xt = a.shift();
@@ -45,43 +69,6 @@ function jeForth() {
 	}
 	function context_word_list(){  // returns the word-list that is searched first.
 		return words[context];
-	}
-	
-	// Reset the forth VM
-	function reset(){
-		// stack = []; don't clear it's a clue for debug
-		rstack = [];
-		dictionary[0]=0; // dictionary[0]=0 reserved for inner() as its terminator
-		compiling=false;
-		ip=0; // forth VM instruction pointer
-		stop = true; // ntib = tib.length; // reserve tib and ntib for debug
-		type('-------------- Reset forth VM --------------\n');
-	}
-	
-	function panic(msg,severe) {
-		var t='';
-		if(compiling) t += '\n------------- Panic! while compiling '+newname+' -------------\n';
-		else t +=          '\n------------------- P A N I C ! -------------------------\n';
-		t += msg;
-		t += "stop: " + stop +'\n';
-		t += "compiling: " + compiling +'\n';
-		t += "stack.length: " + stack.length +'\n';
-		t += "rstack.length: " + rstack.length +'\n';
-		t += "ip: " + ip +'\n';
-		t += "ntib: " + ntib + '\n';
-		t += "tib.length: " + tib.length + '\n';
-		var beforetib = tib.substr(Math.max(ntib-40,0),40);
-		var aftertib  = tib.substr(ntib,80);
-		t += "tib: " + beforetib + "<ntib>" + aftertib + "...\n";
-		type(t);
-		if(compiling) {
-			compiling = false;
-			stop = true; // ntib = tib.length;
-		}
-		if(severe) // switch to JavaScript console, if available, for severe issues.
-			if(tick("jsc")) {
-				dictate("jsc");
-			}
 	}
 
 	// Get string from recent ntib down to, but not including, the next delimiter.
@@ -200,7 +187,7 @@ function jeForth() {
 		var w = 0; 
 		switch(typeof(entry)){
 			case "string": // "string" is word name
-				w = tick(entry.replace(/(^( |\t)*)|(( |\t)*$)/g,'')); // remove leading and tailing white spaces
+				w = tick(entry.trim()); // remove leading and tailing white spaces
 				break;
 			case "function": case "object": // object is a word
 				w = entry; 
@@ -212,7 +199,7 @@ function jeForth() {
 				w = dictionary[ip]; 
 				break;
 			default :
-				panic("Error! execute() doesn't know how to handle this thing : "+entry+" ("+mytypeof(entry)+")\n","severe");
+				panic("Error! execute() doesn't know how to handle this thing : "+entry+" ("+mytypeof(entry)+")\n","err");
 		}
 		return w;
 	}
@@ -231,7 +218,7 @@ function jeForth() {
 				break;
 			case "object": // Word object
 				try { // take care of JavaScript errors to avoid being kicked out very easily
-					w.xt();
+					w.xt(w);
 				} catch(err) {
 					panic('JavaScript error on word "'+w.name+'" : '+err.message+'\n',"error");
 				}
@@ -244,7 +231,8 @@ function jeForth() {
 	function execute(entry) { 
 		var w; 
 		if (w = phaseA(entry)){
-			if(typeof(w)=="number") panic("Error! please use inner("+w+") instead of execute("+w+").\n","severe");
+			if(typeof(w)=="number") 
+				panic("Error! please use inner("+w+") instead of execute("+w+").\n","severe");
 			else phaseB(w); 
 		}
 	}
@@ -284,7 +272,10 @@ function jeForth() {
 			if (w) {
 				if(!compiling){ // interpret state or immediate words
 					if (w.compileonly) {
-						panic("Error! "+token+" is compile-only.\n", tib.length-ntib>100);
+						panic(
+							"Error! "+token+" is compile-only.\n", 
+							tib.length-ntib>100 // error or warning? depends
+						); 
 						return;
 					}
 					execute(w);
@@ -293,7 +284,10 @@ function jeForth() {
 						execute(w); // inner(w);
 					} else {
 						if (w.interpretonly) {
-							panic("Error! "+token+" is interpret-only.\n", tib.length-ntib>100);
+							panic(
+								"Error! "+token+" is interpret-only.\n", 
+								tib.length-ntib>100 // error or warning? depends
+							);
 							return;
 						}
 						comma(w); // compile w into dictionary. w is a Word() object
@@ -301,7 +295,10 @@ function jeForth() {
 				}
 			} else if (isNaN(token)) {
 				// parseInt('123abc') is 123, very wrong! Need to check in prior by isNaN().
-				panic("Error! "+token+" unknown.\n", tib.length-ntib>100);
+				panic(
+					"Error! "+token+" unknown.\n", 
+					tib.length-ntib>100 // error or warning? depends
+				);
 				return;
 			} else {
 				if(token.substr(0,2).toLowerCase()=="0x") var n = parseInt(token);
@@ -326,11 +323,12 @@ function jeForth() {
 		// this function too, that's normal.
 		compiling = "code"; // it's true and a clue of compiling a code word.
 		newname = nexttoken();
-		if(isReDef(newname)) type("reDef "+newname+"\n"); 	// don't use tick(newname), it's wrong.
+		if(isReDef(newname)) panic("reDef "+newname+"\n"); 	// don't use tick(newname), it's wrong.
 		push(nextstring("end-code")); 
 		if(tos().flag){
+			// _me is the code word object itself.
 			eval(
-				'newxt=function(){ /* ' + newname + ' */\n' + 
+				'newxt=function(_me){ /* ' + newname + ' */\n' + 
 				pop().str + '\n}' // the ending "\n}" allows // comment at the end
 			);
 		} else {
@@ -345,11 +343,10 @@ function jeForth() {
 		new Word([
 			"code",
 			docode,
-			"this.vid='root'",
+			"this.vid='forth'",
 			"this.wid=1",
 			"this.type='code'",
-			"this.help='( <name> -- ) Start composing a code word.'",
-			"this.selftest='pass'"
+			"this.help='( <name> -- ) Start composing a code word.'"
 		]),
 		new Word([
 			"end-code",
@@ -363,7 +360,7 @@ function jeForth() {
 				wordhash[last().name]=last();
 				compiling  = false;
 			},
-			"this.vid='root'",
+			"this.vid='forth'",
 			"this.wid=2",
 			"this.type='code'",
 			"this.immediate=true",
@@ -377,9 +374,8 @@ function jeForth() {
 	
 	// -------------------- main() ----------------------------------------
 
-	// Recursively evaluate the input. 
-	// The input can be multiple lines or an entire ~.f file but
-	// it usually is the TIB.
+	// Recursively evaluate the input. The input can be multiple lines or 
+	// an entire ~.f file yet it usually is the TIB.
 	function dictate(input) {
 		var tibwas=tib, ntibwas=ntib, ipwas=ip;
 		tib = input; 
@@ -448,13 +444,13 @@ function jeForth() {
 
 	// typeof(array) and typeof(null) are "object"! So a tweak is needed.
 	function mytypeof(x){
-		var type = typeof x;
-		switch (type) {
+		var ty = typeof x;
+		switch (ty) {
 		case 'object':
-			if (!x) type = 'null';
-			if (Object.prototype.toString.apply(x) === '[object Array]') type = "array";
+			if (!x) ty = 'null';
+			if (Object.prototype.toString.apply(x) === '[object Array]') ty = "array";
 		}
-		return type;
+		return ty;
 	}
 	// js> mytypeof([])           \ ==> array (string)
 	// js> mytypeof(1)            \ ==> number (string)
@@ -465,7 +461,7 @@ function jeForth() {
 
 	vm.stack = function(){return(stack)}; // debug easier. stack got manipulated often, need a fresh grab.
 	vm.rstack = function(){return(rstack)}; // debug easier especially debugging TSR
-	vm.words = words; // debug easier. works.root is the root vocabulary or word-list
+	vm.words = words; // debug easier. works.forth is the root vocabulary or word-list
 	vm.dictionary = dictionary; // debug easier
 }
 if (typeof exports!='undefined') exports.jeForth = jeForth;	// export for node.js APP
