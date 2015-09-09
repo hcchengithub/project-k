@@ -24,12 +24,17 @@ function jeForth() {
 	var newhelp = "";
 	
 	// Call out vm.type()
+	// Kernel has no idea of typing, it does not need to 'type'. This is for 
+	// the convenience of programs in code ... end-code that always need to 
+	// print something.
 	function type(s) {
+		// defined in project-k kernel jeforth.js
 		if(vm.type) vm.type(s);
 	}
 	
 	// Reset the forth VM
 	function reset(){
+		// defined in project-k kernel jeforth.js
 		rstack = [];
 		compiling=false;
 		ip=0; // forth VM instruction pointer
@@ -38,8 +43,13 @@ function jeForth() {
 		// stack = []; I guess it's a clue for debug
 	}
 
-	// Call out vm.panic()
+	// panic() calls out to vm.panic()
+	// The panic() function gets only message and severity level. 
+	// Kernel has no idea how to handle these information so it checks if vm.panic() exists
+	// and pass the {msg,level}, or even more info, over that's all. That's why vm.panic() has to
+	// receive a hash structure, because it must be.
 	function panic(msg,level) {
+		// defined in project-k kernel jeforth.js
 		var state = {
 				msg:msg, level:level
 				// , compiling:compiling, 
@@ -239,6 +249,7 @@ function jeForth() {
 	vm.execute = execute;
 
 	function inner (entry, resuming) {
+		// defined in project-k kernel jeforth.js
 		var w = phaseA(entry);
 		do{
 			while(w) {
