@@ -46,12 +46,12 @@ function jeForth() {
 	// panic() calls out to vm.panic()
 	// The panic() function gets only message and severity level. 
 	// Kernel has no idea how to handle these information so it checks if vm.panic() exists
-	// and pass the {msg,level}, or even more info, over that's all. That's why vm.panic() has to
+	// and pass the {msg,serious}, or even more info, over that's all. That's why vm.panic() has to
 	// receive a hash structure, because it must be.
-	function panic(msg,level) {
+	function panic(msg,serious) {
 		// defined in project-k kernel jeforth.js
 		var state = {
-				msg:msg, level:level
+				msg:msg, serious:serious
 				// , compiling:compiling, 
 				// stack:stack.slice(0), rstack:rstack.slice(0), 
 				// ip:ip, tib:tib, ntib:ntib, stop:stop

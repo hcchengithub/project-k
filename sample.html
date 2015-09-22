@@ -36,7 +36,7 @@
 			vm.screenbuffer+=ss;
 			if(vm.selftest_visible) $('#outputbox').append(plain(ss));  // jquery makes it simple, will be a lot of work otherwise.
         };
-		var panic = vm.panic = function(state){vm.type(state.msg);if(state.level)debugger;}
+		var panic = vm.panic = function(state){vm.type(state.msg);if(state.serious)debugger;}
         
         // The Forth traditional prompt 'OK' is defined and used in this application main program.
         // Forth vm has no idea about vm.prompt but your program may want to know.
