@@ -233,4 +233,4 @@
 [x] 3htm jsc 裡 erase 無效 ... 感謝我自己! 以前已經發現在 jsc console 時
 	inputbox.value 是 \10 因為 \r\n 只吃掉 \r 故留下 \n 使得 inputbox 非 empty 因此
 	{backspace} 不工作。修改判斷條件為 inputbox.value==""||inputbox.value=="\n" 即可
-[ ] tweak cub.html on going . . . so as to make a project-k release
+[x] tweak cub.html on going . . . so as to make a project-k release
