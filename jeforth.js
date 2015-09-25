@@ -197,7 +197,7 @@ function jeForth() {
 		var w = 0; 
 		switch(typeof(entry)){
 			case "string": // "string" is word name
-				w = tick(entry.trim()); // remove leading and tailing white spaces
+				w = tick(entry.replace(/(^( |\t)*)|(( |\t)*$)/mg,'')); // remove leading and tailing white spaces
 				break;
 			case "function": case "object": // object is a word
 				w = entry; 

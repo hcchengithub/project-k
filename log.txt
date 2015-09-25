@@ -164,6 +164,8 @@
 		3. reset() 的 message 沒啥意義
 	==> 已經都用 k :: type=function..., k :: prompt=.. 的方式。
 [x] Javascript 的 string 有 trim() method 可以去頭尾 white spaces, 從來不知。
+	But! project-k can't use string.trim(), Windows XP JScript does not support that.
+	String.replace(/(^( |\t)*)|(( |\t)*$)/mg,''); // remove 頭尾 whitespaces. .trim() 舊 JScript v5.6 未 support
 [x]	stackwas 放在 jeforth.js kernel 裏頭有必要嗎? --> 改成 tick(':').stackwas 了。
 [x] 要參考 code word 自身,用 tick('name') 是可以考慮。有更好的辦法嗎?
 	==> 現在 _me 直接就是該 word object 本身。
