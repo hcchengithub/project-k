@@ -246,7 +246,6 @@ function jeForth() {
 			else phaseB(w); 
 		}
 	}
-	vm.execute = execute;
 
 	function inner (entry, resuming) {
 		// defined in project-k kernel jeforth.js
@@ -397,7 +396,6 @@ function jeForth() {
 		ntib = ntibwas;
 		ip = ipwas;
 	}
-	vm.dictate = dictate;
 
 	// -------------------- end of main() -----------------------------------------
 
@@ -470,10 +468,14 @@ function jeForth() {
 	// js> mytypeof({})           \ ==> object (string)
 	// js> mytypeof(null)         \ ==> null (string)  
 
+	vm.dictate = dictate; // This is where commands are from. A clause or more.
+	vm.execute = execute; // This is where commands are from. A single command.
 	vm.stack = function(){return(stack)}; // debug easier. stack got manipulated often, need a fresh grab.
 	vm.rstack = function(){return(rstack)}; // debug easier especially debugging TSR
 	vm.words = words; // debug easier. works.forth is the root vocabulary or word-list
 	vm.dictionary = dictionary; // debug easier
+	vm.push = push; // interface for passing data into the VM.
+	vm.pop = pop;   // interface for getting data out of the VM.
 }
 if (typeof exports!='undefined') exports.jeForth = jeForth;	// export for node.js APP
 
