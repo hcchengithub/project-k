@@ -1,7 +1,7 @@
 "uses strict";
 function jeForth() {     
 	var vm = this;
-	vm.major_version = 2; // major version, jeforth.js kernel version.
+	vm.major_version = 3; // major version, jeforth.js kernel version.
 	var ip=0;
 	var stack = [] ;
 	var rstack = [];
@@ -476,6 +476,7 @@ function jeForth() {
 	vm.dictionary = dictionary; // debug easier
 	vm.push = push; // interface for passing data into the VM.
 	vm.pop = pop;   // interface for getting data out of the VM.
+	vm.tos = tos;   // interface for getting data out of the VM.
 }
 if (typeof exports!='undefined') exports.jeForth = jeForth;	// export for node.js APP
 
