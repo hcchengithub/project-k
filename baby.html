@@ -60,7 +60,7 @@
             type((cmd?'\n> ':"")+cmd+'\n');
             vm.dictate(cmd);  // Pass the command line to jeForth VM
             type(" " + vm.prompt + " ");
-            jump2endofinputbox.click(); inputbox.focus();
+            window.scrollTo(0,endofinputbox.offsetTop); inputbox.focus();
         }
 
         // onkeydown,onkeypress,onkeyup
