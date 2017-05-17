@@ -125,7 +125,6 @@ function jeForth() {
 	// o  The delimiter is a regular expression.
 	function nexttoken(deli){
 		if (arguments.length==0) deli='\\s';   // white space
-		// if (deli=='\\s') skipWhiteSpaces(); else ntib += 1; // Doesn't matter if already at end of TIB. 
 		switch(deli){
 			case '\\s': skipWhiteSpaces(); break; // skip all leading white spaces
 			case '\\n': case '\n': if (tib[ntib]!='\n') ntib += 1; break;
