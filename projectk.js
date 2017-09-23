@@ -8,7 +8,7 @@
 "uses strict";
 function jeForth() {     
 	var vm = this;
-	vm.major_version = 3; // major version, jeforth.js kernel version.
+	vm.major_version = 3; // major version, projectk.js kernel version.
 	var ip=0;
 	var stack = [] ;
 	var rstack = [];
@@ -35,13 +35,13 @@ function jeForth() {
 	// the convenience of programs in code ... end-code that always need to 
 	// print something.
 	function type(s) {
-		// defined in project-k kernel jeforth.js
+		// defined in project-k kernel projectk.js
 		if(vm.type) vm.type(s);
 	}
 	
 	// Reset the forth VM
 	function reset(){
-		// defined in project-k kernel jeforth.js
+		// defined in project-k kernel projectk.js
 		rstack = [];
 		compiling=false;
 		ip=0; // forth VM instruction pointer
@@ -56,7 +56,7 @@ function jeForth() {
 	// and pass the {msg,serious}, or even more info, over that's all. That's why vm.panic() has to
 	// receive a hash structure, because it must be.
 	function panic(msg,serious) {
-		// defined in project-k kernel jeforth.js
+		// defined in project-k kernel projectk.js
 		var state = {
 				msg:msg, serious:serious
 				// , compiling:compiling, 
@@ -151,7 +151,7 @@ function jeForth() {
 	// May be redefined for selftest to detect private words referenced by name. 
 	// vm.tick keeps the original version.
 	function tick(name) {
-		// defined in project-k jeforth.js 
+		// defined in project-k projectk.js 
 		return wordhash[name] || 0;  // 0 means 'not found'
 	}
 	
@@ -262,7 +262,7 @@ function jeForth() {
 	// May be redefined for selftest to detect private words called by name.
 	// vm.execute keeps the original version.
 	function execute(entry) { 
-		// defined in proejct-k jeforth.js
+		// defined in proejct-k projectk.js
 		var w; 
 		if (w = phaseA(entry)){
 			if(typeof(w)=="number") 
@@ -272,7 +272,7 @@ function jeForth() {
 	}
 
 	function inner (entry, resuming) {
-		// defined in project-k kernel jeforth.js
+		// defined in project-k kernel projectk.js
 		var w = phaseA(entry);
 		do{
 			while(w) {
@@ -346,7 +346,7 @@ function jeForth() {
 	
 	// code ( -- ) Start to compose a code word. docode() is its run-time.
 	// "( ... )" and " \ ..." on first line will be brought into this.help.
-	// jeforth.js kernel has only two words, 'code' and 'end-code', jeforth.f
+	// projectk.js kernel has only two words, 'code' and 'end-code', jeforth.f
 	// will be read from a file that will be a big TIB actually. So we don't 
 	// need to consider about how to get user input from keyboard! Getting
 	// keyboard input is difficult to me on an event-driven or a non-blocking 

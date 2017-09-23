@@ -10,7 +10,7 @@
             }
     </style>
 	<script type="text/javascript" src="http://ajax.microsoft.com/ajax/jQuery/jquery-1.11.2.js"></script>	
-    <Script type="text/javascript" src="jeforth.js"></Script>
+    <Script type="text/javascript" src="projectk.js"></Script>
     <script>
     window.vm = new jeForth();
     // vm is now the jeforth virtual machine object. It has no idea about the outside world
@@ -19,7 +19,7 @@
 
     (function(){
 		// version
-		// minor version specified by application, major version is from jeforth.js kernel.
+		// minor version specified by application, major version is from projectk.js kernel.
 		vm.minor_version = 1; 
 		var version = parseFloat(vm.major_version+"."+vm.minor_version);
 		
@@ -148,7 +148,7 @@
 					end-code
 					// ( <name ..code..> -- ) Start composing a code word.
 
-	code init		( -- ) \ Initialize vm.g.members that are moved out from jeforth.js which is thus kept pure.
+	code init		( -- ) \ Initialize vm.g.members that are moved out from projectk.js which is thus kept pure.
 					// An array's length is array.length but there's no such thing of hash.length for hash{}.
 					// memberCount(object) gets the given object's member count which is also a hash table's length.
 					vm.g = {}; // The global hash
@@ -309,7 +309,7 @@
 						我嘗試了種種的 self-test 寫法。有的很醜，混在正常程式裡面相當有礙視線；不醜的很
 						累，佔很大 source code 篇幅。
 
-						以下是發展到目前最好的方法，jeforth.js kernel  裡只有 code end-code 兩個基本 
+						以下是發展到目前最好的方法，projectk.js kernel  裡只有 code end-code 兩個基本 
 						words, 剛進到 jeforth.f  只憑這兩個基本 words 就馬上要為每個 word 都做 self-test 
 						原本是很困難的。 然而，jeforth.f 是整個檔案一次讀進來成為大大的一個 TIB 的， 所
 						以其中已經含有 jeforth.f 的全部功能。如果 self-test 安排在所有的 words 都 load 

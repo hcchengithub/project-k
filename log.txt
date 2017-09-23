@@ -236,3 +236,8 @@
 	inputbox.value 是 \10 因為 \r\n 只吃掉 \r 故留下 \n 使得 inputbox 非 empty 因此
 	{backspace} 不工作。修改判斷條件為 inputbox.value==""||inputbox.value=="\n" 即可
 [x] tweak cub.html on going . . . so as to make a project-k release
+[x] 12:18 2017-09-23 jeforth.js 改名為 projectk.js 因為 peforth 的 kernel 叫
+    projectk.py 如果叫 peforth.py 整個 project 就會到處都是 peforth.xxx 搞不清都是些啥。
+[ ] 整理 project-k 的 wiki. 特別是改名成 projectk.js 之後。而且還增加了 projectk.py 
+
+    
