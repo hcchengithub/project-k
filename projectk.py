@@ -8,6 +8,7 @@
 import re    # import whatever we want, don't rely on parent module
 import pdb
 import os
+import sys
 import inspect  # print (inspect.getsource(func))
 import dis      # dis.dis(func) 
 import json
@@ -278,14 +279,16 @@ def execute(entry):
             panic("Error! please use inner("+w+") instead of execute("+w+").\n","severe");
         else:
             phaseB(w); 
+            return(vm) # support function cascade
     else:
         panic(entry + " unknown!")
 
+# FORTH inner loop of project-k VM
 def inner(entry, resuming=None):
     # defined in project-k kernel peforth.py
     global ip
     w = phaseA(entry);
-    while True: 
+    while not stop: 
         while w:      # this is the very inner loop
             ip += 1   # Forth general rule. IP points to the *next* word. 
             phaseB(w) # execute it
@@ -300,12 +303,10 @@ def inner(entry, resuming=None):
             break  # Resuming inner loop. ip==0 means resuming has done。
     ### End of the inner loop ###
 
-# -------------------------- the outer loop ----------------------------------------------------
-# forth outer loop, 
+# FORTH outer loop of project-k VM
 # If entry is given then resume from the entry point by executing 
-# the remaining colon thread down until ip reaches 0. That's resume.
+# the remaining colon thread down until ip reaches 0, that's resume.
 # Then proceed with the tib/ntib string.
-# 
 def outer(entry=None):
     # Handle one token. 
     def outerExecute(token):
@@ -331,21 +332,47 @@ def outer(entry=None):
                         return;
                     comma(w);  # compile w into dictionary. w is a Word() object
         else:
-            try:
-                # token is a number
-                n = complex(token) # triggers exception if token is not a number
-                if int(n.real)==float(n.real): 
-                    n = int(n.real)
+            # token is unknown or number
+            # This line: f = float(token) makes problems try-except can not catch
+            def is_number(s):
+                # https://stackoverflow.com/questions/354038/how-do-i-check-if-a-string-is-a-number-float
+                try:
+                    complex(s) # for int, float and complex
+                except ValueError:
+                    return False
+                return True            
+            n = None  # 
+            if is_number(token):
+                # token is (int, float, complex) we ignore complex so far
+                f = complex(token).real
+                i = int(f)
+                if i==f: 
+                    n = i
                 else:
-                    n = float(n.real)
+                    n = f
+            else: 
+                # token is unknown or (hex, oct, binary)
+                def panic_unknown():
+                    panic(
+                        "Error! "+token+" unknown.\n", 
+                        len(tib)-ntib>100  # error or warning? depends
+                    );
+                try:
+                    # token is a number
+                    if token[:2] in ["0x","0X"]:
+                        n = int(token,base=16)
+                    elif token[:2] in ["0o","0O"]:
+                        n = int(token,base=8)
+                    elif token[:2] in ["0b","0B"]:
+                        n = int(token,base=2)
+                    else:
+                        panic_unknown()
+                except Exception as err:
+                    panic_unknown()
+            if n != None :
                 push(n)
                 if (compiling):
                     execute("literal");
-            except:
-                panic(
-                    "Error! "+token+" unknown.", 
-                    len(tib)-ntib>100  # error or warning? depends
-                );
     if (entry):
         inner(entry, True);  # resume from the breakpoint 
     while(not stop):
@@ -356,11 +383,12 @@ def outer(entry=None):
     ### End of the outer loop ###
 
 
-# code ( -- ) Start to compose a code word. docode() is its run-time.
-# "( ... )" and " \ ..." on first line will be brought into word.help attribute.
-# peforth.py kernel has only two words, 'code' and 'end-code', peforth.f
-# will be read from a file that will be a big TIB actually. So we don't 
-# need to consider about how to get user input from keyboard.
+# Generates the .xt() function of all code words.
+# Python does not support annonymous function so we use genxt() instead.
+# _me argument refers to the word object itself, if you need to access
+# any attribute of the word. 
+# xt.__doc__ keeps the source code.
+# py: help(genxt) to read me.
 def genxt(name, body):
     ll = {}
     # _me will be the code word object itself.
@@ -383,10 +411,11 @@ def genxt(name, body):
     return ll['xt']
 
 
-# python does not support annoymous function. But it supports closure, 
-# so we can recover it. genfunc("body","args") returns a function which 
+# Python does not support annoymous function, this can be recovered by 
+# using closure. genfunc("body","args","name") returns a function which 
 # is composed by the given function name, source code and arguments.
-# Where the function name is for debug.
+# <name>.__doc__ keeps the source code.
+# py: help(genfunc) to read me.
 def genfunc(body,args,name):
     local = {}
     source = "def {}({}):".format(name,args)
@@ -400,16 +429,14 @@ def genfunc(body,args,name):
     return local[name]
 
 
-# forth 'code' definition        
+# The basic FORTH word 'code's run time. 
 def docode(_me=None):
-    # [ ] check if this is true for python, it is for javascript
-    # All future code words can see local variables in here, so don't use
-    # any local variable. They can *see* variables & functions out side 
-    # this function too, that's normal.
+    # All future code words can see local variables in here, for jeforth.3we.
+    # [x] check if this is true for python, <== Not True for Python.
     global compiling, newname, newxt, newhelp, ntib
     newname = nexttoken();
     if isReDef(newname): # don't use tick(newname), it's wrong.
-        panic("reDef "+newname, False);
+        print("reDef " + newname);
     # get code body
     push(nextstring("end-code")); 
     if tos()['flag']:
@@ -424,7 +451,7 @@ code.wid  = 1
 code.type = 'code'
 code.help = '( <name> -- ) Start composing a code word.'
 
-# forth 'end-code' definition    
+# The basic FORTH word 'end-code's run time. 
 def doendcode(_me=None):
     global compiling
     if compiling!="code":
@@ -455,9 +482,9 @@ words[current] = [0,code,endcode]
 # Use the best of JavaScript to find a word.
 wordhash = {"code":current_word_list()[1], "end-code":current_word_list()[2]};
     
-# -------------------- main() ----------------------------------------
-# Recursively evaluate the input. The input can be multiple lines or 
-# an entire ~.f file yet it usually is the TIB.
+# Command interface to the project-k VM. 
+# The input can be multiple lines or an entire ~.f file.
+# Yet it usually is the TIB (Terminal input buffer).
 def dictate(input):
     global tib, ntib, ip, stop
     tibwas  = tib
@@ -470,6 +497,7 @@ def dictate(input):
     tib = tibwas;
     ntib = ntibwas;
     ip = ipwas;
+    return(vm) # support function cascade
 # -------------------- end of main() -----------------------------------------
 
 # Top of Stack access easier. ( tos(2) tos(1) tos(void|0) -- ditto )
@@ -501,8 +529,10 @@ def rtos(index=None,value=None):
         rstack[len(rstack)-1-index] = value; 
         return(data); 
         
-# rstack access easier. e.g. rpop(1) gets rtos(1) ( rtos(2) rtos(1) rtos(0) -- rtos(2) rtos(0) )
-# push(formula(rpop(i)),i-1) manipulates the rtos(i) directly, usually when i is the index of a loop.
+# rstack access easier. e.g. rpop(1) gets rtos(1) 
+# ( rtos(2) rtos(1) rtos(0) -- rtos(2) rtos(0) )
+# push(formula(rpop(i)),i-1) manipulates the rtos(i) directly, usually when i is the index 
+# of a loop.
 def rpop(index=None):
     if index==None:
         return rstack.pop();
@@ -517,8 +547,10 @@ def pop(index=None):
     else:
         return stack.pop(len(stack)-1-index);
 
-# Stack access easier. e.g. push(data,1) inserts data to tos(1), ( tos2 tos1 tos -- tos2 tos1 data tos )
-# push(formula(pop(i)),i-1) manipulate the tos(i) directly, usually when i is the index of a loop.
+# Stack access easier. e.g. push(data,1) inserts data to tos(1), 
+# ( tos2 tos1 tos -- tos2 tos1 data tos )
+# push(formula(pop(i)),i-1) manipulate the tos(i) directly, usually when i 
+# is the index of a loop.
 def push(data=None, index=None):
     global stack
     if index==None:
@@ -526,4 +558,4 @@ def push(data=None, index=None):
     else:
         stack.insert(len(stack)-1-index,data);
 
-    # 這個用不上 panic(" push() what?");  為了允許 push(None)
+# ---- end of projectk.py ----
