@@ -9,13 +9,20 @@ end of 2011. It's a very simple way to develop your own FORTH system
 anywhere JavaScript is available -- Web page, HTA, Node.js, Node-Webkit 
 or NW.js, and Windows DOS box, to name only those have tested so far.  
 
-Python version is now available too. See https://github.com/hcchengithub/peforth 
-
-This project has only one file, projectk.js, which provides two FORTH 
-words, "code" and "end-code", and a few other FORTH related JavaScript 
-global functions like push(), pop(), tos(), tick(), and last(), etc. 
+This project has only one file, `projectk.js`, which reduces the original jeForth 
+down to having only two FORTH 
+words, "`code`" and "`end-code`", and a few other JavaScript 
+global functions like `push()`, `pop()`, `tos()`, `tick()`, and `last()`, etc. 
 The benefit is that, having JavaScript host behind, we don't need to build 
 an entire FORTH system to do just a little thing in FORTH way. 
+
+**New!** Python version is now available too. Thanks to the jupyter notebook and the 
+binder technology we can use project-k online to start building your own system. 
+Play it now if you have 15 minutes: [https://mybinder.org/v2/gh/hcchengithub/project-k/master?filepath=Play%20with%20the%20FORTH%20kernel%20on%20jupyter%20notebook.ipynb](
+https://mybinder.org/v2/gh/hcchengithub/project-k/master?filepath=Play%20with%20the%20FORTH%20kernel%20on%20jupyter%20notebook.ipynb)
+
+See also https://github.com/hcchengithub/peforth which is a developped python FORTH top on project-k.
+
 
 # play now
 
