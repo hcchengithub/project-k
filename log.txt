@@ -242,6 +242,8 @@
 [ ] peforth 1.15 之後增加了 function cascading 的功能，應該要更擴大點，不限於
     ok, dictate, push, execute 至少還有 tick 也要。
     [ ] 擴展到 project-k.js 版。
-    
+[ ] 把 project-k 的 iquery 拿掉不用，避免 rawgit 老是出問題。
+    目前 baby.html 經由 rawgit 執行時，要改成 https 才能 include 到 projectk.js. 而 sample.html
+    沒有出錯，但是半路就停住了。兩者用 local host 執行都沒問題。
     
     
