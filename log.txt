@@ -238,12 +238,15 @@
 [x] tweak cub.html on going . . . so as to make a project-k release
 [x] 12:18 2017-09-23 jeforth.js 改名為 projectk.js 因為 peforth 的 kernel 叫
     projectk.py 如果叫 peforth.py 整個 project 就會到處都是 peforth.xxx 搞不清都是些啥。
+[x] peforth 1.15 之後增加了 function cascading 的功能，應該要更擴大點，不限於
+    ok, dictate, push, execute 至少還有 tick 也要 <-- 錯，tick 本來就有 return 值。
+[x] cascade 擴展到 project-k.js 版。奇怪，以前有改好過怎麼不見了？
+    --> 確定有
+        > <js> push(123).dictate(" dup + . ")</js>
+        246 OK 
+    
 [ ] 整理 project-k 的 wiki. 特別是改名成 projectk.js 之後。而且還增加了 projectk.py 
-[ ] peforth 1.15 之後增加了 function cascading 的功能，應該要更擴大點，不限於
-    ok, dictate, push, execute 至少還有 tick 也要。
-    [ ] 擴展到 project-k.js 版。
-[ ] 把 project-k 的 iquery 拿掉不用，避免 rawgit 老是出問題。
+[ ] 把 project-k 的 jquery 拿掉不用，避免 rawgit 老是出問題。
     目前 baby.html 經由 rawgit 執行時，要改成 https 才能 include 到 projectk.js. 而 sample.html
     沒有出錯，但是半路就停住了。兩者用 local host 執行都沒問題。
-    
     
