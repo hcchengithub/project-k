@@ -5,13 +5,7 @@
 # FigTaiwan H.C. Chen hcchen5600@gmail.com 21:14 2017-07-31
 #
 
-import re    # import whatever we want, don't rely on parent module
-import pdb
-import os
-import sys
-import inspect  # print (inspect.getsource(func))
-import dis      # dis.dis(func) 
-import json
+import re, sys
 
 name = "peforth"
 vm = __import__(__name__)
@@ -37,8 +31,6 @@ stop = False;  # Stop the outer loop
 newname = "";  # new word's name
 newxt = None
 newhelp = "";
-debug = False; # debugging flag    
-local = {} # Utilized in exec(source,globals(),local) 
     
 # Reset the forth VM
 def reset():
@@ -62,16 +54,6 @@ class Word:
         return self.name + " " + self.help + ' __str__'
     def __repr__(self):   # execute xt and return help message
         return "<Word '{}'>".format(self.name)
-
-# Comment object does nothing but carrying the comment.
-# Was used to explain the following code object which's __doc__ is read-only.
-class Comment:
-    def __init__(self, comment):
-        self.comment = comment
-    def __str__(self):    # return help message
-        return self.comment
-    def __repr__(self):   # execute xt and return help message
-        return "<class 'comment'>"
         
 # returns the last defined word.
 def last():  
@@ -447,6 +429,7 @@ def docode(_me=None):
     else:
         panic("Error! expecting 'end-code'.");
         reset();
+
 code = Word('code', docode)
 code.vid  = 'forth'
 code.wid  = 1
@@ -462,8 +445,13 @@ def doendcode(_me=None):
     last().vid = current;
     last().wid = len(current_word_list())-1;
     last().type = 'code';
+    # ---------
+    mm = re.match(r"^.*?#\s*(.*)$", last().xt.__doc__.split('\n')[1])
+    last().help = mm.groups()[0] if mm and mm.groups()[0] else ""
+    # ---------
     wordhash[last().name] = last();
     compiling = False; 
+
 endcode = Word('end-code', doendcode)
 endcode.vid  = 'forth'
 endcode.wid  = 2
@@ -473,15 +461,11 @@ endcode.compileonly = True
 endcode.help = '( -- ) Wrap up the new code word.'
 
 # forth master word-list
-# words[current] = [
-#     0,  # Letting current_word_list()[0] == 0 has many advantages. When tick('name') 
-#         # returns a 0, current_word_list()[0] is 0 too, indicates a not-found.
-#     code,
-#     endcode
-#     ];
+# Letting current_word_list()[0] == 0 has many advantages. When tick('name') 
+# returns a 0, current_word_list()[0] is 0 too, indicates a not-found.
 words[current] = [0,code,endcode]
     
-# Use the best of JavaScript to find a word.
+# Find a word as soon as possible.
 wordhash = {"code":current_word_list()[1], "end-code":current_word_list()[2]};
     
 # Command interface to the project-k VM. 
@@ -515,7 +499,6 @@ def tos(index=None,value=None):
         data = stack[len(stack)-1-index];
         stack[len(stack)-1-index] = value; 
         return(data); 
-
 
 # Top of return Stack access easier. ( rtos(2) rtos(1) rtos(void|0) -- ditto )
 # rtos(i,new) returns rtos(i) and by the way change rtos(i) to new value this is good
