@@ -252,3 +252,5 @@
     
 [X] 2020/03/23 14:07:46 sample.html 在 2018.7.23 之後到今天之前都是 corrupted 一直都沒發現，今從 2018.7.20
 	舊版救回來，在 chrome 上一次 ok。
+[X] 2020/03/23 16:08:42 發現 sample.html selftest 不過，因為缺 vm.greeting() 且 invisible 也沒寫好。
+	proeforth.html 弄好了，奇怪，以前是怎麼過的？
