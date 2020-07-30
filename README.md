@@ -53,7 +53,7 @@ to avoid the little obstacle.
 
 projectk.js is the only file in this project. The below two lines generate a FORTH Virtual Machine on your web page in HTML:
 
-    <script src="./projectk.js"></script>
+    <script src="http://hcchengithub.github.io/project-k/projectk.js"></script>
     <script> vm = new jeForth(); </script>
 
 Now we have an object 'vm' which is the FORTH virtual machine that has only two FORTH words 'coce' and 'end-code'. Use the two words to create your own entire FORTH system then. 
