@@ -68,7 +68,7 @@ On variant applications, how to get the project-k VM up and running,
 
 **a.** For HTML and HTA:
 
-    <script src="./projectk.js"></script>
+    <script src="http://hcchengithub.github.io/project-k/projectk.js"></script>
     <script> vm = new jeForth(); </script>
 
 **b.** For Node.js and Node-webkit:
