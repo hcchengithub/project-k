@@ -27,15 +27,14 @@ See also https://github.com/hcchengithub/peforth which is a developped python FO
 # play now
 
 Click one of the following links to play demo directly from the GitHub 
-repository through the amazing service of "rawgit.com",
+repository,
 
 **baby.html**<br>
-* baby.html : http://rawgit.com/hcchengithub/project-k/master/baby.html
-* baby.html (cdn): http://cdn.rawgit.com/hcchengithub/project-k/master/baby.html
+* baby.html : [http://hcchengithub.github.io/project-k/baby.html](http://hcchengithub.github.io/project-k/baby.html)
 
 **sample.html**<br>
-* sample.html : http://rawgit.com/hcchengithub/project-k/master/sample.html
-* sample.html (cdn): http://cdn.rawgit.com/hcchengithub/project-k/master/sample.html
+* sample.html : [http://hcchengithub.github.io/project-k/sample.html](http://hcchengithub.github.io/project-k/sample.html) 
+
 
 Try one or the other, cdn may be necessary at where you are.
 Demo **baby.html** is very simple and its FORTH source code area is very short 
@@ -54,7 +53,7 @@ to avoid the little obstacle.
 
 projectk.js is the only file in this project. The below two lines generate a FORTH Virtual Machine on your web page in HTML:
 
-    <script src="./projectk.js"></script>
+    <script src="http://hcchengithub.github.io/project-k/projectk.js"></script>
     <script> vm = new jeForth(); </script>
 
 Now we have an object 'vm' which is the FORTH virtual machine that has only two FORTH words 'coce' and 'end-code'. Use the two words to create your own entire FORTH system then. 
@@ -68,7 +67,7 @@ On variant applications, how to get the project-k VM up and running,
 
 **a.** For HTML and HTA:
 
-    <script src="./projectk.js"></script>
+    <script src="http://hcchengithub.github.io/project-k/projectk.js"></script>
     <script> vm = new jeForth(); </script>
 
 **b.** For Node.js and Node-webkit:
