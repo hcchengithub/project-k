@@ -30,12 +30,11 @@ Click one of the following links to play demo directly from the GitHub
 repository through the amazing service of "rawgit.com",
 
 **baby.html**<br>
-* baby.html : http://rawgit.com/hcchengithub/project-k/master/baby.html
-* baby.html (cdn): http://cdn.rawgit.com/hcchengithub/project-k/master/baby.html
+* baby.html : [http://hcchengithub.github.io/project-k/baby.html](http://hcchengithub.github.io/project-k/baby.html)
 
 **sample.html**<br>
-* sample.html : http://rawgit.com/hcchengithub/project-k/master/sample.html
-* sample.html (cdn): http://cdn.rawgit.com/hcchengithub/project-k/master/sample.html
+* sample.html : [http://hcchengithub.github.io/project-k/sample.html](http://hcchengithub.github.io/project-k/sample.html) 
+
 
 Try one or the other, cdn may be necessary at where you are.
 Demo **baby.html** is very simple and its FORTH source code area is very short 
