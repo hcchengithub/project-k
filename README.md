@@ -27,7 +27,7 @@ See also https://github.com/hcchengithub/peforth which is a developped python FO
 # play now
 
 Click one of the following links to play demo directly from the GitHub 
-repository through the amazing service of "rawgit.com",
+repository,
 
 **baby.html**<br>
 * baby.html : [http://hcchengithub.github.io/project-k/baby.html](http://hcchengithub.github.io/project-k/baby.html)
