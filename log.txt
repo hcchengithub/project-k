@@ -254,3 +254,7 @@
 	舊版救回來，在 chrome 上一次 ok。
 [X] 2020/03/23 16:08:42 發現 sample.html selftest 不過，因為缺 vm.greeting() 且 invisible 也沒寫好。
 	proeforth.html 弄好了，奇怪，以前是怎麼過的？
+[ ] 10:53 2020/12/04 向爽哥介紹 project-k 馬上發現此前寫法不漂亮。
+    定義 dstack 就該把 push pop 包進去變成是它的 method 
+    comma() here 是 dictionary 的 method and property 
+    etc 
