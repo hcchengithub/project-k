@@ -26,10 +26,12 @@ if(!jeForth){ function jeForth() {
 	var RET=null; // The 'ret' instruction code. It marks the end of a colon word.
 	var EXIT=""; // The 'exit' instruction code.
 	var compiling=false;
-	var stop = false; // Stop the outer loop
 	var newname = ""; // new word's name
 	var newxt = function(){}; // new word's function()
 	var newhelp = "";
+	vm.stop = false; // Stop the outer loop
+	var pendingSuspendHandler = null;
+	var suspendedOuter = false;
 
 	// Call out vm.type()
 	// Kernel has no idea of typing, it does not need to 'type'. This is for
@@ -46,7 +48,7 @@ if(!jeForth){ function jeForth() {
 		rstack = [];
 		compiling=false;
 		ip=0; // forth VM instruction pointer
-		stop = true;
+		vm.stop = true;
 		ntib = tib.length; // don't clear tib, a clue for debug.
 		// stack = []; I guess it's a clue for debug
 	}
@@ -268,7 +270,12 @@ if(!jeForth){ function jeForth() {
 		if (w = phaseA(entry)){
 			if(typeof(w)=="number")
 				panic("Error! please use inner("+w+") instead of execute("+w+").\n","severe");
-			else phaseB(w);
+			else {
+				phaseB(w);
+				if(performSuspend("outer")){
+					return vm;
+				}
+			}
 		}
         return vm; // function cascading
 	}
@@ -280,7 +287,11 @@ if(!jeForth){ function jeForth() {
 			while(w) {
 				ip++; // Forth general rule. IP points to the *next* word.
 				phaseB(w);
-				w = dictionary[ip];
+				if(performSuspend("inner")){
+					w = 0;
+				} else {
+					w = dictionary[ip];
+				}
 			}
 			if(w===0) break; // w==0 is suspend, break inner loop but reserve rstack.
 			else ip = rstack.pop(); // w is either ret(NULL) or exit(""), return to caller, or 0 when resuming through outer(entry)
@@ -297,10 +308,13 @@ if(!jeForth){ function jeForth() {
 	//
 	function outer(entry) {
 		if (entry) inner(entry, true); // resume from the breakpoint
-		while(!stop) {
+		while(!vm.stop && !suspendedOuter) {
 			var token=nexttoken();
 			if (token==="") break;    // TIB done, loop exit.
 			outerExecute(token);
+			if(suspendedOuter){
+				break;
+			}
 		}
 		// Handle one token.
 		function outerExecute(token){
@@ -315,9 +329,15 @@ if(!jeForth){ function jeForth() {
 						return;
 					}
 					execute(w);
+					if(suspendedOuter){
+						return;
+					}
 				} else { // compile state
 					if (w.immediate) {
 						execute(w); // inner(w);
+						if(suspendedOuter){
+							return;
+						}
 					} else {
 						if (w.interpretonly) {
 							panic(
@@ -340,7 +360,12 @@ if(!jeForth){ function jeForth() {
 				if(token.substr(0,2).toLowerCase()=="0x") var n = parseInt(token);
 				else  var n = parseFloat(token);
 				push(n);
-				if (compiling) execute("literal");
+				if (compiling) {
+					execute("literal");
+				}
+				if(suspendedOuter){
+					return;
+				}
 			}
 		}
 	}
@@ -416,12 +441,67 @@ if(!jeForth){ function jeForth() {
 		var tibwas=tib, ntibwas=ntib, ipwas=ip;
 		tib = input;
 		ntib = 0;
-		stop = false; // stop outer loop
+		// stop = false; should be cleared by user inputbox UI
+		suspendedOuter = false;
 		outer();
 		tib = tibwas;
 		ntib = ntibwas;
 		ip = ipwas;
         return vm; // function cascading
+	}
+
+	function captureThreadState(mode){
+		return {
+			stack: stack.slice(0),
+			rstack: rstack.slice(0),
+			ip: ip,
+			tib: tib,
+			ntib: ntib,
+			compiling: compiling,
+			stop: vm.stop,
+			resumeMode: mode || "inner"
+		};
+	}
+
+	function restoreThreadState(state){
+		if(!state){ return null; }
+		stack = state.stack.slice(0);
+		rstack = state.rstack.slice(0);
+		ip = state.ip;
+		tib = state.tib;
+		ntib = state.ntib;
+		compiling = state.compiling;
+		vm.stop = state.stop;
+		return state;
+	}
+
+	function resetHostAfterSuspend(){
+		stack = [];
+		rstack = [];
+		ip = 0;
+		tib = "";
+		ntib = 0;
+		compiling = false;
+		vm.stop = false;
+	}
+
+	function performSuspend(mode){
+		if(!pendingSuspendHandler){
+			return false;
+		}
+		var handler = pendingSuspendHandler;
+		pendingSuspendHandler = null;
+		if(mode === "outer"){
+			suspendedOuter = true;
+		}
+		var snapshot = captureThreadState(mode);
+		resetHostAfterSuspend();
+		try{
+			handler(snapshot);
+		}catch(err){
+			panic("suspend handler error: " + err.message + "\n","error");
+		}
+		return true;
 	}
 
 	// -------------------- end of main() -----------------------------------------
@@ -496,6 +576,50 @@ if(!jeForth){ function jeForth() {
 	// js> mytypeof({})           \ ==> object (string)
 	// js> mytypeof(null)         \ ==> null (string)
 
+	function defaultSchedule(cb, delay){
+		if(typeof setTimeout === "function") return setTimeout(cb, delay);
+		if(typeof globalThis !== "undefined" && typeof globalThis.setTimeout === "function") return globalThis.setTimeout(cb, delay);
+		if(vm.g && typeof vm.g.setTimeout === "function") return vm.g.setTimeout(cb, delay);
+		panic("No available setTimeout for suspend/resume.\n","error");
+		return null;
+	}
+
+	function defaultCancel(id){
+		if(typeof clearTimeout === "function") clearTimeout(id);
+		else if(typeof globalThis !== "undefined" && typeof globalThis.clearTimeout === "function") globalThis.clearTimeout(id);
+		else if(vm.g && typeof vm.g.clearTimeout === "function") vm.g.clearTimeout(id);
+	}
+
+	vm.scheduleResume = vm.scheduleResume || defaultSchedule;
+	vm.cancelResume = vm.cancelResume || defaultCancel;
+
+	vm.suspendCurrentThread = function(handler){
+		if(typeof handler !== "function"){
+			panic("Error! suspendCurrentThread needs a callback.\n","error");
+			return;
+		}
+		if(pendingSuspendHandler){
+			panic("Error! suspend already requested.\n","error");
+			return;
+		}
+		vm.__pendingResumes = (vm.__pendingResumes || 0) + 1;
+		pendingSuspendHandler = handler;
+	};
+
+vm.resumeThread = function(snapshot){
+		if(!snapshot){ return; }
+		var state = restoreThreadState(snapshot);
+		if(!state){ return; }
+		suspendedOuter = false;
+		vm.stop = false;
+		vm.__pendingResumes = Math.max(0, (vm.__pendingResumes || 0) - 1);
+		if(state.resumeMode === "outer"){
+			outer();
+		}else{
+			outer(state.ip);
+		}
+	};
+
 	vm.dictate = dictate; // This is where commands are from. A clause or more.
 	vm.execute = execute; // Original version. Execute a single command.
 	vm.stack = function(){return(stack)}; // debug easier. stack got manipulated often, need a fresh grab.
@@ -507,6 +631,7 @@ if(!jeForth){ function jeForth() {
 	vm.tos = tos;   // interface for getting data out of the VM.
 	vm.reset = reset; // Recovery from a crash
 	vm.tick = tick; // Original version. Get a word object.
+	vm.outer = outer;
+	vm.wordhash = function(){return(wordhash)};
 }}
 if (typeof exports!='undefined') exports.jeForth = jeForth;	// export for node.js APP
-
