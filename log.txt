@@ -50,8 +50,8 @@
 		是 forth vocabulary, 另有 words.assembler[], words.excel[], 以及 words.canvas[] 等。
 		用哪一種好，應該怎麼決定？ hcchen5600 2015/04/27 16:23:00	
 [x] project-k introduction to FigTaiwan
-	[ ] 主動用 Google polling 催請 FigTaiwan 回覆意見
-	[ ]	introduce to lang.forth after FigTaiwan approve it.
+	[/] 主動用 Google polling 催請 FigTaiwan 回覆意見
+	[/]	introduce to lang.forth after FigTaiwan approve it.
 	
 	[X] jeforth.js 的結構如下，這樣好嗎？
 		---- jeforth.js 只有三塊，如下三行 ----
@@ -86,7 +86,7 @@
 	==> No. 只提供 baby.html，要完整的 forth 系統直接介紹 jeforth.3we。
 [x] change all kvm to vm.
 [x] remove kernel.js , kernel.f 
-[ ] 上英文社群推廣 jeforth kernel。
+[/] 上英文社群推廣 jeforth kernel。
 [x] textarea 稱作 jeforth.f 會引起誤會，以為是讀 file 進來的。改稱 source_code 即可。
 
 
@@ -124,7 +124,7 @@
 [x] 錯了！ kernel 怎知自己叫作 vm ??????? init() 要改。
 	> vm.init.toString()
 	'function () { \r\n\t\ttype = vm.type;\r\n\t}'		
-	[x] baby.html  [x] node.js  [ ] bbt.html 	
+	[x] baby.html  [x] node.js
 	==> 其實沒錯，因為 jeforth.js 裡面看到的 vm 就是自己。不是外面那個 vm instance.	
 
 [x] 準備回應爽哥要求 jeforth.html 改寫中, 
@@ -205,7 +205,7 @@
 		// debug
 		vm.bp = 0 // breakpoint  <---- tick("*debug*").breakpoint=0
 		vm.continue = 0 // *debug* resume point   <---- tick("*debug*").resume=null
-	[x] index.html [x] cub.html [ ] 3nw [ ] 3nd 
+	[x] index.html [x] cub.html
 	
 [x] some application didn't use this trick
 		e = (e) ? e : event; var keycode = (e.keyCode) ? e.keyCode : (e.which) ? e.which : false;
@@ -245,10 +245,11 @@
         > <js> push(123).dictate(" dup + . ")</js>
         246 OK 
     
-[ ] 整理 project-k 的 wiki. 特別是改名成 projectk.js 之後。而且還增加了 projectk.py 
-[ ] 把 project-k 的 jquery 拿掉不用，避免 rawgit 老是出問題。
+[x] 整理 project-k 的 wiki. 特別是改名成 projectk.js 之後。而且還增加了 projectk.py 
+[X] 把 project-k 的 jquery 拿掉不用，避免 rawgit 老是出問題。
     目前 baby.html 經由 rawgit 執行時，要改成 https 才能 include 到 projectk.js. 而 sample.html
     沒有出錯，但是半路就停住了。兩者用 local host 執行都沒問題。
+    12:45 2026-10-06 Done
     
 [X] 2020/03/23 14:07:46 sample.html 在 2018.7.23 之後到今天之前都是 corrupted 一直都沒發現，今從 2018.7.20
 	舊版救回來，在 chrome 上一次 ok。
@@ -258,3 +259,14 @@
     定義 dstack 就該把 push pop 包進去變成是它的 method 
     comma() here 是 dictionary 的 method and property 
     etc 
+[ ] 12:47 2026-10-06 用 AI 倒推成 SPEC，然後再回頭實現出來。
+    最近在學會 LINE 群討論到用 AI 做比較正經的事情時，要讓它先寫 conceptual SPEC，然後寫 implementation plan.
+    昨天 2026.10.04 禮拜天，我在計程車上想到：那要不然就請 AI 幫我把 peforce 的 kernel project-k 現有的 kernel code 反推回 SPEC，然後再實作回來，看看效果怎麼樣。
+    因為那時候我才剛開始學 Python，一直覺得原本的 code 寫得不是很好。結果在計程車上，這些事情說著說著初版就已經完成了！
+    以下我把 AI 幫我寫好的 SPEC、展開回來的 Python source code，以及它裡面有一個非常有意思的新 word 叫 "pause" 請 AI 講解清楚。。。。
+    --
+    13:11 2026-10-06
+    Python 的成果就是目前的 v2，那本來的就是 v1。
+    --
+    13:12 2026-10-06
+    試試看倒推 projectK.js

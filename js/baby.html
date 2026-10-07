@@ -9,7 +9,6 @@
                 background:#E0E0E0;
             }
     </style>
-	<script type="text/javascript" src="https://ajax.microsoft.com/ajax/jQuery/jquery-1.11.2.js"></script>	
     <script src="https://hcchengithub.github.io/project-k/projectk.js"></script>
     <Script src="projectk.js"></Script>
     <script id=js>
@@ -28,7 +27,7 @@
             } catch(err) {
                 ss = Object.prototype.toString.apply(s);
             }
-            $('#outputbox').append(plain(ss));
+            document.getElementById('outputbox').insertAdjacentHTML('beforeend', plain(ss));
         };
         
         // The Forth traditional prompt 'OK' is defined and used in this application main program.
@@ -46,7 +45,7 @@
         vm.clearScreen = clearScreen;
 
         // System initialization
-        jQuery(document).ready(
+        window.addEventListener('DOMContentLoaded',
             function() {
                 document.onkeydown = hotKeyHandler; // Must be using onkeydown so as to grab the control.
                 // vm.dictate() is the Forth command interface.
@@ -106,8 +105,8 @@ code words  for(var i=1; i<words.forth.length; i++) type(words.forth[i].name+" "
 code help   for(var i=1; i<words.forth.length; i++) 
             type(words.forth[i].name+" "+words.forth[i].help+'\n') 
             end-code // ( -- ) List all words' help message
-code hide   $("#source_box").hide() end-code // ( -- ) Hide the source code box by jQuery.
-code show   $("#source_box").show() end-code // ( -- ) Show the source code box by jQuery.
+code hide   document.getElementById("source_box").style.display="none" end-code // ( -- ) Hide the source code box.
+code show   document.getElementById("source_box").style.display="" end-code // ( -- ) Show the source code box.
 code hi     type("Hello World!\n") end-code // ( -- ) Print hello world
 code .      type(pop()) end-code // ( n -- ) Print the TOS top of the Forth data stack.
 code +      push(pop(1)+pop()) end-code // ( a b -- a+b ) Add two numbers or strings

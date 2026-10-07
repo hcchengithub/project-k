@@ -9,7 +9,6 @@
                 background:#E0E0E0;
             }
     </style>
-    <script type="text/javascript" src="https://ajax.microsoft.com/ajax/jQuery/jquery-1.11.2.js"></script>   
     <script src="https://hcchengithub.github.io/project-k/projectk.js"></script>
     <Script type="text/javascript" src="projectk.js"></Script>
     <script>
@@ -35,7 +34,7 @@
                 ss = Object.prototype.toString.apply(s);
             }
             vm.screenbuffer+=ss;
-            if(vm.selftest_visible) $('#outputbox').append(plain(ss));  // jquery makes it simple, will be a lot of work otherwise.
+            if(vm.selftest_visible) document.getElementById('outputbox').insertAdjacentHTML('beforeend', plain(ss));
         };
         var panic = vm.panic = function(state){vm.type(state.msg);if(state.serious)debugger;}
         
@@ -59,7 +58,7 @@
         vm.clearScreen = clearScreen;
         
         // System initialization
-        jQuery(document).ready(
+        window.addEventListener('DOMContentLoaded',
             function() {
                 document.onkeydown = hotKeyHandler; // Must be using onkeydown so as to grab the control.
                 // vm.dictate() is the only Forth command interface.
