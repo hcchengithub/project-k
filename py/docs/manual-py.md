@@ -1,6 +1,6 @@
 # Project K (Python Edition) 技術手冊與架構設計理念
 
-> **版本**：v2.0 (Python Host Core)  
+> **版本**：16:32 2026-10-08
 > **適用環境**：Python 3.10+ / Linux, WSL, Windows  
 > **核心代碼**：`projectk.py`, `repl.py`, `base.f`
 
