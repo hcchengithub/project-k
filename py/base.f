@@ -875,3 +875,9 @@ code bye
 end-code
 // ( -- ) Exit the Forth process.
 /// Terminate execution immediately via SystemExit(0).
+
+code cls
+    print("\x1b[2J\x1b[H", end="", flush=True)
+end-code
+// ( -- ) Clear the visible terminal screen and move the cursor to the top-left.
+/// Output ANSI escape sequences; requires an ANSI-compatible terminal.

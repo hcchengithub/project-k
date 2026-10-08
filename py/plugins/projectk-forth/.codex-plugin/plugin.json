@@ -1,0 +1,6 @@
+{
+  "name": "projectk-forth",
+  "description": "Project K Forth language guidance for the Python CLI agent.",
+  "version": "1.0.0",
+  "skills": "./skills/"
+}

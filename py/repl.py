@@ -4,6 +4,7 @@
 import os
 import re
 import sys
+from collections import deque
 
 # Ensure projectk can be imported regardless of current working directory
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -16,6 +17,7 @@ except ImportError:
     pass
 
 from projectk import VM, ForthError
+import ai_bridge
 
 
 class Constant:
@@ -45,6 +47,7 @@ class Value:
 
 
 BASE_F_PATH = os.path.join(SCRIPT_DIR, "base.f")
+AI_F_PATH = os.path.join(SCRIPT_DIR, "ai.f")
 
 
 def _comment_line(vm: VM) -> None:
@@ -82,6 +85,10 @@ def create_vm(base_file: str | None = None) -> VM:
         vm.dictate(bootstrap)
     else:
         raise ForthError(f"Bootstrap file not found: {target_base}")
+    ai_bridge.install(vm)
+    if os.path.isfile(AI_F_PATH):
+        with open(AI_F_PATH, "r", encoding="utf-8") as f:
+            vm.dictate(f.read())
     return vm
 
 
@@ -117,7 +124,10 @@ def _process_one_line(vm: VM, line: str, state: dict) -> None:
 
     task = vm.dictate(line)
     if task.status == "paused":
-        print("Task: paused")
+        if vm.host.get("ai_pending_approval"):
+            state["ai_task"] = task
+        else:
+            print("Task: paused")
     elif not vm.compiling:
         print(" ok")
 
@@ -127,17 +137,27 @@ def repl(vm: VM | None = None) -> None:
         vm = create_vm()
 
     print("Project K Forth REPL")
-    print("Type 'words' to list words, 'bye' or Ctrl-D to exit.\n")
+    print("Type 'words' to list words, 'ai: <prompt>' to ask AI, or 'bye'/Ctrl-D to exit.\n")
 
-    state = {"in_code_block": False, "code_buffer": []}
+    state = {"in_code_block": False, "code_buffer": [], "ai_task": None,
+             "queued": deque(), "displayed_approval": None}
 
     while True:
         try:
-            if state["in_code_block"] or vm.compiling:
-                prompt = "... "
+            pending = vm.host.get("ai_pending_approval")
+            if pending:
+                call_id = pending["action"].get("call_id")
+                if state["displayed_approval"] != call_id:
+                    print("\nAI proposes this Forth program:")
+                    print(f"Purpose: {pending['purpose']}\n---\n{pending['source']}\n---")
+                    state["displayed_approval"] = call_id
+                prompt = "Run it? Type yes, no, or cancel (other Forth lines will queue): "
+            elif state["queued"]:
+                raw_input = state["queued"].popleft()
+                _process_one_line(vm, raw_input, state)
+                continue
             else:
-                prompt = "> "
-
+                prompt = "... " if state["in_code_block"] or vm.compiling else "> "
             raw_input = input(prompt)
 
             # Strip bracketed paste escape sequences if present
@@ -147,7 +167,46 @@ def repl(vm: VM | None = None) -> None:
             # Support pasting multiple lines in a single paste burst
             lines = clean_input.split("\n")
             for line in lines:
-                _process_one_line(vm, line, state)
+                pending = vm.host.get("ai_pending_approval")
+                if pending:
+                    choice = line.strip().casefold()
+                    if choice in {"yes", "y"}:
+                        vm.host["ai_approval_result"] = True
+                    elif choice in {"no", "n"}:
+                        vm.host["ai_approval_result"] = False
+                    elif choice in {"cancel", "ai-cancel"}:
+                        task = state.get("ai_task")
+                        try:
+                            ai_bridge.cancel_turn()
+                        except Exception as err:
+                            print(f"Could not cancel remote turn: {err}")
+                        if task:
+                            task.cancel()
+                        state["ai_task"] = None
+                        vm.host.pop("ai_pending_approval", None)
+                        vm.host.pop("ai_approval_result", None)
+                        state["displayed_approval"] = None
+                        print("AI task cancelled locally.")
+                        continue
+                    else:
+                        if line.strip():
+                            state["queued"].append(line)
+                        continue
+                    vm.host.pop("ai_pending_approval", None)
+                    state["displayed_approval"] = None
+                    task = state.get("ai_task")
+                    state["ai_task"] = None
+                    if task:
+                        task.resume()
+                        if task.status == "paused" and vm.host.get("ai_pending_approval"):
+                            state["ai_task"] = task
+                        elif task.status == "done":
+                            print(" ok")
+                    continue
+                if state["queued"]:
+                    state["queued"].append(line)
+                else:
+                    _process_one_line(vm, line, state)
 
         except ForthError as err:
             print(f"Error: {err}")
@@ -157,6 +216,18 @@ def repl(vm: VM | None = None) -> None:
                 vm._discard_definition()
         except KeyboardInterrupt:
             print("\n<interrupted>")
+            if vm.host.get("ai_pending_approval"):
+                try:
+                    ai_bridge.cancel_turn()
+                except Exception as err:
+                    print(f"Could not cancel remote turn: {err}")
+                task = state.get("ai_task")
+                if task:
+                    task.cancel()
+                state["ai_task"] = None
+                vm.host.pop("ai_pending_approval", None)
+                vm.host.pop("ai_approval_result", None)
+                state["displayed_approval"] = None
             state["in_code_block"] = False
             state["code_buffer"] = []
             if vm.compiling:

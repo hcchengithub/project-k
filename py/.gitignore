@@ -1,0 +1,5 @@
+.env
+.ai_session.json
+.ai_session.tmp
+__pycache__/
+*.py[cod]
