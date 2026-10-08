@@ -373,6 +373,69 @@ flowchart TB
 
 ---
 
+#### 3. 非同步 IO 期間的 PAD：天然的指令 Queue（情境一）
+
+當 Project K 邁入非同步與多任務協作（例如調用大型語言模型 AI、等待非同步網路封包或計時器）時，PAD 架構展現出了令人驚豔的雙重用途：**它既是文字草稿區，也是單一 Task 內部的指令排程佇列（Queue）！**
+
+##### 當執行陷入漫長等待時，新輸入去了哪裡？
+假設使用者在 REPL 送出了一條耗時的 AI 查詢：
+```forth
+ai-ask "請分析這段代碼的潛在漏洞..."   \ Task 1 在此發起請求並執行 pause 暫停
+```
+此時，外部 AI 可能需要數秒甚至數十秒才會回傳。在傳統阻塞式系統中，終端機會直接凍結、鼠標轉圈、禁止任何輸入；但在 Project K 中，Task 1 已透過 `yield vm.pause()` 主動交還控制權。
+
+若使用者在等待 AI 回應期間，又在鍵盤上打入了後續處理指令並按下 Enter：
+```forth
+.s cr print-result
+```
+在 **「情境一：指令排隊（Queue in TIB / PAD）」** 的調度策略下，這段新輸入不會被丟棄，而是被 Host 直接追加（`append`）到當前 Task 的 `tib` 陣列尾端（即 `itib` 後方的 PAD 區域）：
+
+```python
+# 初始狀態：Task 正在執行 tib[1] 的 ai-ask，觸發 pause 讓出 CPU
+tib = [": ai-ask ... ;", "ai-ask '...'",]
+itib = 1
+
+# 使用者趁等待時又輸入新指令，Host 將其追加進 PAD 區域
+tib = [": ai-ask ... ;", "ai-ask '...'", ".s cr print-result"]
+itib = 1
+```
+
+```mermaid
+sequenceDiagram
+    participant U as "使用者 (User)"
+    participant H as "Host REPL"
+    participant T as "Task 1 (TIB / PAD)"
+    participant AI as "外部 AI 服務"
+
+    U->>H: 輸入 ai-ask "..." (Enter)
+    H->>T: evaluate() 推進至 itib=1
+    T->>AI: 發起非同步請求
+    T-->>H: yield vm.pause() 讓出控制權
+    Note over T: Task 1 狀態 = paused<br/>itib 停在 1
+
+    U->>H: 趁等待期間輸入 ".s cr print-result" (Enter)
+    H->>T: tib.append(".s cr print-result") (追加至 PAD)
+    Note over T: tib[2] 排隊中，itib 仍為 1
+
+    AI-->>H: AI 回應送達
+    H->>T: task.resume() 喚醒 Task 1
+    T->>T: 完成 ai-ask，結果推入 stack
+    T->>T: itib 自動推進至 2，繼續執行 .s cr print-result
+    T-->>U: 印出 stack 與處理結果
+```
+
+##### 執行期無縫銜接
+當 AI 回應終於到達時，Host 呼叫 `task.resume()`。Task 1 甦醒並完成當前的 `ai-ask`，語彙分析器檢測到當前緩衝區已讀完，立刻觸發：
+```python
+if self.itib + 1 < len(self.tib):
+    self.itib += 1
+    continue
+```
+`itib` 順暢前進至 `2`，無縫接著執行排隊在 PAD 裡的 `.s cr print-result`！  
+這證明了在 Project K 裡，**未消費的 TIB/PAD 空間本質上就是一條天然的非同步指令 Pipeline**。
+
+---
+
 ## 第四章：流程控制結構的創新實現 (Control Structures: Classical Elegance on Modern VM)
 
 ### 4.1 現代結構下的經典優雅
@@ -654,11 +717,11 @@ end-code
 
 ---
 
-## 第七章：任務、Pause 與 Coroutine 機制 (Task, Pause & Coroutines)
+## 第七章：任務架構、資源邊界與非同步調度 (Task, Pause & Concurrency Architecture)
 
-### 7.1 主流非同步編程的困局與批判 (Critique of Mainstream Asynchronous Paradigms)
+### 7.1 主流非同步與並行編程的困局與批判 (Critique of Mainstream Concurrency Paradigms)
 
-在深入 Project K 的 Coroutine 設計前，我們必須徹底審視現代主流語言在處理非同步 (Asynchronous) 問題時，積累了多少沉重、勉強而費工夫的歷史包袱：
+在深入 Project K 的 Coroutine 與多任務設計前，我們必須徹底審視現代主流語言在處理非同步 (Asynchronous) 與並行 (Concurrency) 問題時，積累了多少沉重、勉強而費工夫的歷史包袱。理解這些批判，能幫助我們清楚看見 Project K 所處的坐標，並深入體會其核心內涵：
 
 #### 1. 盲目猜測的「Timeout」之痛
 幾乎所有傳統系統在面臨等待時，第一反應都是引入 `timeout` 參數。但 Timeout 本質上是一場注定痛苦的猜測：
@@ -675,11 +738,15 @@ end-code
 * 藍色函數可以呼叫藍色函數；但只要底層某個微小葉節點變成了紅色 (`async`)，所有直接或間接呼叫它的上層函數**必須全面染紅，且每一層呼叫前都必須強制加上 `await`**！
 * 這在軟體工程中造成了極其嚴重的傳染性代碼重構，將同一個語言分裂為兩個平行宇宙。
 
-#### 4. 重量級 Thread 與鎖的泥淖
+#### 4. 重量級 OS Thread 與鎖的泥淖
 為了避開非同步語法，另一派採用作業系統 thread (OS Threads)。但在多 thread 並行下，共享記憶體的幽靈如影隨形：資料競爭 (Race Conditions)、互斥鎖 (Mutex)、死鎖 (Deadlock) 與記憶體屏障，將程式複雜度推向毀滅邊緣。
 
-#### 5. 核心 API 的策略臃腫
-許多系統硬把外面的「策略」塞進底層關鍵字：在 wait 函數裡強塞優先級、事件 ID、取消令牌 (Cancellation Token) 與逾時數值，導致底層引擎臃腫脆弱。
+#### 5. 「完全隔離 (Shared-Nothing)」與「完全全域 (Everything-Global)」的兩極迷思
+在處理多任務狀態時，電腦科學界長期陷入兩極化的極端思維：
+* **極端一：Erlang / Go 的完全隔離 (Shared-Nothing)**：
+  Actor 模型與 CSP 模型主張任務之間絕不共享記憶體，所有資料必須透過信箱或通道傳遞。這保證了安全，代價卻是沉重的記憶體複製、序列化開銷，以及無法共享中央字典與資料管線的靈活性。
+* **極端二：傳統 Forth 的完全全域 (Everything-Global)**：
+  傳統 Forth 誕生於資源極度受限的單執行緒硬體時代，習慣將所有狀態視為全域：單一 Data stack、單一 Return stack、單一輸入指標。這種設計在單線執行時極致精簡，然而一旦邁入現代非同步 IO（例如等待 AI 回應或網路請求），只要一個任務暫停，另一個任務插隊就會立即造成致命的狀態覆蓋與踩踏。
 
 ---
 
@@ -687,7 +754,7 @@ end-code
 
 面對上述亂象，Project K 選擇了一條回歸電腦科學純粹本質的道路：
 
-#### `pause` 的純粹性
+#### `pause` 的極致純粹性
 在 Project K 裡，`pause` **沒有任何參數、不接受 Timeout、不繫結 Event ID、不負責排程優先級**。它在核心中真的只有這三行代碼：
 ```python
 code pause
@@ -701,58 +768,30 @@ end-code
 * 呼叫一個會暫停的 Word，呼叫者**完全不需要改變語法**，不需要加 `async`，不需要加 `await`。
 * 底層的 Continuation 透過 Python 生成器的 `yield from` 穿透機制，全自動、無感地在 call stack 向上委派凍結。整個 Forth 語言世界永遠保持統一、純粹。
 
-#### Single-Thread 內的絕對安全
-由於 VM 是 single-thread 協作式運作，所有 stack 與記憶體狀態在切換時均完全受控，**徹底消滅了鎖、互斥量與 Race Condition**。
+#### Single-Thread 協作式的絕對安全
+由於 VM 採用 single-thread 協作式模型，每一瞬間只有一個任務在走動，所有 stack 與記憶體狀態在切換時均完全受控，**徹底消滅了鎖、互斥量與 Race Condition**。
 
 ---
 
-### 7.3 深入理解 `pause`：兩個直觀模型
+### 7.3 Task 的生命本質：每一次 `dictate()` 都是一個獨立 Task
 
-為了透徹理解 `pause` 的架構威力，我們建立兩個生活中的直觀認知模型：
+在 Project K 的架構構想中，`Task` 不是外掛的附加品，它是**執行的最小生命單元**與 **Continuation 的具體承載者**。
 
-#### 模型一：無知的警衛 (The Unaware Guard / Polling Scheduler)
-* **場景**：一棟大樓的夜間巡邏警衛，他每隔一段時間巡邏一個房間，敲門確認狀況。警衛本身是「無知」的，他不知道每個房間裡面的人在等什麼（等快遞？等天亮？等電話？）。
-* **運作機制**：
-  1. Python Host 就是這個警衛。它只管無腦輪播巡邏名單中的任務：`task.resume()`。
-  2. 任務被叫醒，自己檢查條件（例如是否有鍵盤輸入 `key?`）。
-  3. 若條件未滿足，任務瀟灑地說一句 `pause`：「我還沒好，你先去巡別間吧！」
-  4. 控制權退回警衛，警衛繼續巡邏下一個任務。
-  5. 直到某一次敲門，條件滿足了，任務順利走出迴圈完成工作。
-* **Forth 代碼視角**：
-  ```forth
-  : key ( -- char )
-      begin key? 0= while pause repeat
-      get-char ;
-  ```
-  **Python Host 保持極致無知，任務自己掌握等待策略。兩者徹底解耦！**
+#### 1. `dictate()` 的本質
+當我們在 Host Python 或 REPL 中執行 `vm.dictate(text)` 時，底層執行的不是一段單純的同步直譯迴圈，而是立即孕育出一個新的 `Task` 實例：
+```python
+def dictate(self, text):
+    return Task(self, self.evaluate(text)).resume()
+```
+每次敲下 Enter 送入一行指令，系統便啟動一個專屬的 Task，並立刻將其推進至第一個暫停點或完成狀態。
 
----
+#### 2. Continuation 的具體承載
+Task 持有最外層的 Generator（`self._steps`），它就像是這段尚未走完之路程的守護者：
+* 凍結了目前執行到哪一個 Word 的哪一步（instruction pointer `ip`）；
+* 保留了尚未返回的 Generator call stack 與區域變數；
+* 封裝了該執行的特定上下文與輸入串流。
 
-#### 模型二：震動號碼牌 (The Restaurant Buzzer / Event-driven Continuation)
-* **場景**：你到美食街點了一杯手沖咖啡。店員收了錢，遞給你一個**「震動號碼牌」**。
-* **運作機制**：
-  1. 你拿到號碼牌後，直接趴在桌上睡覺（執行 `pause`）。
-  2. 請注意：**這時候你根本不需要設鬧鐘，也不需要每隔五秒抬頭看一次（完全不需要迴圈！）**。
-  3. Python Host 拿到了你的 `Task`，將其掛鉤在「網路連線或事件通知」上，Host 轉身去處理其他事情。
-  4. 漫長的時間過去，咖啡終於煮好，號碼牌開始震動！
-  5. Python Host 走過來搖醒你：`task.resume()`。
-  6. **當你睜開眼的那一刻，咖啡已經熱騰騰擺在桌上了！你還需要問「咖啡好了沒」嗎？完全不用！**
-* **Forth 代碼視角**：
-  ```forth
-  : fetch-remote-data ( url -- response )
-      start-async-request   \ 發起請求，掛上震動號碼牌
-      pause                 \ 瀟灑趴下睡覺！沒有迴圈！
-      read-result ;         \ 甦醒瞬間，資料保證已在 stack 上！
-  ```
-
-**無論外面的世界是「無知的警衛」還是「貼心的號碼牌」，Project K 內部的 `pause` 定義永遠完全一樣！這就是機制與策略分離的最高境界。**
-
----
-
-### 7.4 `Task` 狀態機與 Generator 深度整合
-
-當在 Python 中調用 `vm.dictate(text)` 或 `vm.execute(op)` 時，系統回傳一個活生生的 `Task` 實例：
-
+#### 3. Task 狀態機
 ```mermaid
 flowchart TD
     Ready["ready (初始就緒)"] -->|"resume()"| Running["running (執行中)"]
@@ -763,10 +802,215 @@ flowchart TD
     Running -->|"vm.abort()"| Aborted["aborted (中止)"]
 ```
 
-* `status`：`ready`、`running`、`paused`、`done`、`aborted`、`failed`。
-* **Generator 穿透機制**：
-  VM 的核心調用器 `call()` 是一個 Python Generator。當任何 Word 發出 `yield vm.pause()` 時，生成器鏈條層層向上 yield，將整個直譯器的指令位址、區域 frame 與 stack 狀態完整封裝進 Python 生成器閉包中。  
-  呼叫端只要保存這個 `Task`，即可在數毫秒後、數分鐘後、甚至跨越事件迴圈，精準透過 `task.resume()` 恢復執行。
+* `ready`：任務已配置，尚未踏出第一步。
+* `running`：任務正在直譯迴圈或 Word 內部推進。
+* `paused`：任務執行到 `pause`，主動釋放 CPU，狀態安穩凍結，等待外部事件喚醒。
+* `done`：指令串流已完全消化，任務圓滿完成。
+* `failed`：執行中拋出未捕獲的例外，已被隔離並記錄於 `task.error`。
+* `aborted`：任務被 `vm.abort()` 或 Host `task.cancel()` 中途取消，未編譯完成的定義自動回滾。
+
+---
+
+### 7.4 資源全景哲學：全域共享 (Global) vs. 任務私有 (Task-Private)
+
+Project K 既不盲從 Erlang/Go 的「全面隔離（Shared-Nothing）」，也不固守傳統 Forth 的「全面全域（Everything-Global）」，而是開闢了一條極其優雅的第三條路：
+
+> **「只隔離執行進度與串流，共享字典與計算空間。」**
+
+```mermaid
+flowchart TB
+    subgraph VM_Space ["VM 全域共享空間 (Global Space)"]
+        direction TB
+        Words["字典 Dictionary (vm.words)<br/>共享詞彙與 Defining Words"]
+        DStack["資料 Data Stack (vm.stack)<br/>共享運算管線與參數流轉"]
+        HostCtx["Host 橋接環境 (vm.host)<br/>共享 Python API 與全域資源"]
+        DefOwner["編譯擁有者鎖 (_definition.owner)"]
+    end
+
+    subgraph Task1 ["Task 1 私有領域 (Task Private)"]
+        direction TB
+        T1_Cont["Continuation (_steps)<br/>獨立 Generator 呼叫鏈"]
+        T1_TIB["輸入串流 (inputs)<br/>獨立 TIB / iTIB 陣列"]
+        T1_RS["Return Stack (task.rstack)<br/>私有迴圈指標與暫存"]
+        T1_Stat["生命狀態 (status / error)"]
+    end
+
+    subgraph Task2 ["Task 2 私有領域 (Task Private)"]
+        direction TB
+        T2_Cont["Continuation (_steps)<br/>獨立 Generator 呼叫鏈"]
+        T2_TIB["輸入串流 (inputs)<br/>獨立 TIB / iTIB 陣列"]
+        T2_RS["Return Stack (task.rstack)<br/>私有迴圈指標與暫存"]
+        T2_Stat["生命狀態 (status / error)"]
+    end
+
+    Task1 -.->|"共享存取與操縱"| VM_Space
+    Task2 -.->|"共享存取與操縱"| VM_Space
+```
+
+#### 資源拓撲劃分矩陣
+
+| 資源類別 | 實體屬性 | 歸屬範疇 | 設計思維與邊界理由 |
+| :--- | :--- | :--- | :--- |
+| **Continuation 鏈** | `task._steps` | **Task Private** | 保留尚未完成的呼叫鏈與 instruction pointer，各任務執行進度絕不混淆。 |
+| **輸入串流緩衝區** | `task.inputs` (`tib`/`itib`) | **Task Private** | 各任務讀取自己的字符串流，獨立消費 Token，絕不互相搶字。 |
+| **Return Stack** | `task.rstack` | **Task Private** | 保留私有迴圈計數器（`for...next`）與暫存變數（`>r`），防止跨任務踩踏。 |
+| **生命與錯誤狀態** | `task.status` / `task.error` | **Task Private** | 任務的成敗與中斷彼此隔離，單一任務崩潰不直接摧毀其他任務。 |
+| **字典庫** | `vm.words` | **Global Shared** | 任務共享全體 Word 定義；Task 1 定義的新詞，Task 2 立即可用。 |
+| **資料 Stack** | `vm.stack` | **Global Shared** | 承襲 Forth 中央暫存器哲學，提供最高自由度的資料流轉與任務間協同。 |
+| **Host 橋接環境** | `vm.host` | **Global Shared** | 統一提供 Python 模組、原生函式與系統常數之橋接。 |
+| **編譯定義鎖** | `vm._definition` | **Global (帶 Owner)** | 雖然掛在 VM 上，但標記 owner 屬於哪個 Task，避免並行編譯踩壞詞條。 |
+
+---
+
+### 7.5 從傳統誤區到 Task 境界：為什麼 Return Stack 必須是 Task Private？
+
+在 Project K 的早期探索中，我們曾一度沿襲傳統 Forth 的慣性思維：既然 Data stack 放在全域，那麼 Return stack 似乎也理所當然地被放在全域（宣告為 `vm.host["rstack"] = []`）。
+
+**然而，當 Project K 真正跨入 Task 的境界時，我們意識到了這是一個歷史遺留的重大錯誤！**
+
+#### 1. 全域 Return Stack 的致命陷阱
+考慮以下經典計數迴圈：
+```forth
+: pause-loop  2 for r@ pause next ;
+```
+在執行時，`for` 會將迴圈計數器壓入 Return Stack。當任務在迴圈內部執行 `pause` 暫停時，計數器正安靜地躺在 Return Stack 上。
+
+如果 Return Stack 是全域共享的：
+1. Task 1 在迴圈中 `pause` 讓出 CPU；
+2. 此時使用者或 Host 啟動了 Task 2 執行另一個簡單迴圈：`0 5 for r@ + next`；
+3. Task 2 的 `for` 與 `doNext` 會立即改寫甚至 pop 掉同一個全域 Return Stack！
+4. 當 Task 1 稍後被 `resume()` 喚醒時，眼前的 Return Stack 早已被毀滅殆盡，迴圈指標完全錯亂。
+
+#### 2. 架構躍升：物理私有化與智慧代理
+認清這一點後，我們徹底打破了傳統束縛，確立了 **「Return Stack 必須是 Task Private」** 的鐵律：
+
+* **物理私有**：直接將 `rstack` 綁定在 `Task` 實例身上（`task.rstack = []`）。
+* **智慧代理 (`_RStackProxy`)**：在 `vm.host` 中注入動態代理物件，當 Forth 的 `>r`、`r>`、`r@`、`rdrop` 或 `doNext` 運行時，代理自動路由至當前活躍 Task 的私有 `rstack`：
+  ```python
+  class _RStackProxy:
+      def append(self, item): self._vm.rstack.append(item)
+      def pop(self, *args):
+          try: return self._vm.rstack.pop(*args)
+          except IndexError: raise ForthError("Return stack underflow")
+  ```
+* **多任務交錯安全保證**：
+  Task 1 在迴圈中暫停時，其私有計數器安全封存於自身；Task 2 插隊執行任何迴圈均在自己的 `task2.rstack` 內進行，彼此秋毫無犯！
+
+```mermaid
+sequenceDiagram
+    participant T1 as "Task 1 (pause-loop)"
+    participant RS1 as "Task 1 rstack"
+    participant H as "Python Host"
+    participant T2 as "Task 2 (other-loop)"
+    participant RS2 as "Task 2 rstack"
+
+    H->>T1: dictate("pause-loop")
+    T1->>RS1: 2 >r (計數器 2 壓入私有 rstack)
+    T1-->>H: pause (暫停讓出)
+    Note over T1,RS1: Task 1 凍結，RS1 保留 [2]
+
+    H->>T2: dictate("0 3 for r@ + next")
+    T2->>RS2: 3 >r (獨立壓入 RS2，絕不影響 RS1！)
+    T2->>T2: 完成迴圈計算 6
+    T2-->>H: done (Task 2 完成)
+
+    H->>T1: task1.resume()
+    Note over T1,RS1: Task 1 甦醒，RS1 依舊是 [2]！
+    T1->>RS1: doNext (安全遞減為 1，繼續下次循環)
+```
+
+---
+
+### 7.6 非同步 IO 期間的兩種調度流派：情境一 vs. 情境二深度對決
+
+當前一個 Task 送入 VM 後觸發了耗時的非同步等待（例如調用大型語言模型 AI 回應），此時使用者在終端機繼續輸入新的指令並按下 Enter，**這段新輸入究竟會跑到哪裡去？**
+
+這正是體現 Project K「機制與策略分離」最精彩之處。在架構上存在兩種清晰的調度策略：
+
+#### 情境一：同一 Task 內的指令排隊 (Queue in TIB / PAD)
+* **意圖**：使用者打入的新指令是「等前一個動作（AI 回應）完成後，接續處理」的後續步驟。
+* **流轉**：
+  新輸入被追加（`append`）到當前 Task 的 `tib` 陣列尾端（即 `itib` 後方的 PAD 緩衝區）。
+* **執行**：
+  Task 1 暫停期間，`tib` 就是天然的指令 Queue。等到 AI 回應到達、Task 1 被 `resume()` 喚醒並結束當前指令後，直譯迴圈推進 `itib`，無縫接著消化排隊指令。
+
+#### 情境二：獨立 Task 的並行互動與插隊執行 (Concurrent Tasks via Host)
+* **意圖**：使用者在等待 AI 回應的十幾秒內不想乾等，而是想要「趁機做其他事」——例如檢查狀態 `.s`、定義新詞、執行數學計算、甚至發出 `vm.abort()` 中斷卡住的請求。
+* **流轉**：
+  這段新輸入**完全不會進入 Task 1 的 TIB**！Host REPL 收到這行輸入後，直接發起一個全新獨立的 **Task 2**（`vm.dictate(new_input)`）。
+* **執行**：
+  1. Task 1 在 `pause` 時已經主動退出 `vm._active`，安靜在背景等待；
+  2. Task 2 擁有自己獨立的 `inputs` 與 `rstack`，立即在共享的 VM 字典與記憶體中執行完畢並印出結果；
+  3. 當 AI 結果最終送達時，Host 再喚醒 Task 1 繼續執行。
+
+```mermaid
+sequenceDiagram
+    participant U as "使用者 (User)"
+    participant H as "Host REPL"
+    participant T1 as "Task 1 (AI Request)"
+    participant T2 as "Task 2 (即時插隊查詢)"
+    participant AI as "外部 AI 服務"
+
+    U->>H: 1. 輸入 "call-ai" (Enter)
+    H->>T1: dictate("call-ai")
+    T1->>AI: 發出非同步請求
+    T1-->>H: yield vm.pause()
+    Note over T1: Task 1 退出 _active<br/>狀態為 paused
+
+    U->>H: 2. 等待期間輸入 "10 20 + ." (Enter)
+    H->>T2: vm.dictate("10 20 + .") (啟動獨立 Task 2)
+    Note over T2: 擁有獨立 inputs 與 rstack
+    T2->>T2: 計算 30 並輸出 "30 ok"
+    T2-->>H: done (Task 2 退場)
+
+    AI-->>H: 3. AI 結果完成回傳
+    H->>T1: task1.resume() (喚醒 Task 1)
+    T1->>T1: 讀取結果，推入 stack
+    T1-->>H: done (Task 1 完成)
+```
+
+#### 機制與策略的純粹分工
+* **VM 核心提供機制 (Mechanism)**：
+  每個 Task 擁有獨立的 `inputs` 與 `rstack`，直譯迴圈原生支援中斷與恢復。
+* **Host REPL 決定策略 (Policy)**：
+  Host 可以自由決定收到鍵盤 Enter 時，是選擇追加進當前任務的 TIB（情境一），還是開啟全新的獨立任務插隊互動（情境二）。
+
+---
+
+### 7.7 深入理解 `pause`：兩個直觀模型
+
+為了透徹理解 `pause` 在不同 Host 策略下的運作，我們回顧兩個極具代表性的直觀生活模型：
+
+#### 模型一：無知的警衛 (The Unaware Guard / Polling Scheduler)
+* **場景**：一棟大樓的夜間巡邏警衛，每隔一段時間巡邏房間，敲門確認狀況。警衛本身是「無知」的，不知道每個房間在等什麼。
+* **運作機制**：
+  1. Python Host 扮演警衛，定期輪巡任務清單：`task.resume()`；
+  2. 任務被叫醒，自己檢查等待條件（例如檢查鍵盤緩衝區 `key?`）；
+  3. 若條件尚未滿足，任務說一句 `pause`：「我還沒好，請去巡別間！」；
+  4. 控制權交還警衛，警衛繼續巡邏下一個任務，直到某次條件滿足走出迴圈。
+* **Forth 代碼視角**：
+  ```forth
+  : key ( -- char )
+      begin key? 0= while pause repeat
+      get-char ;
+  ```
+
+#### 模型二：震動號碼牌 (The Restaurant Buzzer / Event-driven Continuation)
+* **場景**：在美食街點餐後拿到一個「震動號碼牌」。
+* **運作機制**：
+  1. 顧客拿到號碼牌後直接趴在桌上睡覺（執行 `pause`），完全不需要設鬧鐘或頻繁抬頭張望（無須 polling 迴圈）；
+  2. Python Host 將 `Task` 參照掛鉤在非同步事件的回呼上，轉身處理其他事務；
+  3. 餐點備妥時號碼牌震動，Host 喚醒顧客：`task.resume()`；
+  4. 顧客睜開眼時餐點已在桌上，直接享用！
+* **Forth 代碼視角**：
+  ```forth
+  : fetch-remote-data ( url -- response )
+      start-async-request   \ 發起請求，掛上震動號碼牌
+      pause                 \ 瀟灑趴下睡覺！無須迴圈！
+      read-result ;         \ 甦醒瞬間，資料保證已在 stack 上！
+  ```
+
+**無論 Host 採行的是「巡邏警衛（Polling）」還是「震動號碼牌（Event-driven）」，Project K 內部的 `pause` 原力永遠純粹如一。**
 
 ---
 
