@@ -69,7 +69,9 @@ flowchart TB
    * 運算元的流通中心與參數傳遞管線。
    * 物理實作為 Python 原生 `list`。所有的推入 (`push`) 與彈出 (`pop`) 均受到邊界保護；當 stack 為空而嘗試 pop 時，由 Python 層級直接拋出明確的 `ForthError("Data stack is empty")`，杜絕記憶體隨機損毀。
 2. **Return Stack (`rstack`)**：
-   * 用於計數迴圈計數器暫存（如 `for ... next`）、執行上下文保護以及程式流程的臨時中轉（`>r`, `r>`）。
+   * **Task Private 私有資源**：每個 Task 擁有專屬獨立的 `rstack`（物理存儲於 `Task.rstack`，透過 `vm.rstack` 代理動態路由至當前活躍 Task）。
+   * 用於計數迴圈計數器暫存（如 `for ... next`）、執行上下文保護以及程式流程的臨時中轉（`>r`, `r>`, `r@`, `rdrop`）。
+   * 即使某個 Task 在迴圈內部呼叫 `pause` 暫停，其迴圈狀態與計數器仍安穩封裝於該 Task 的私有 `rstack` 中；其他並行插隊執行的 Task 擁有自己的 `rstack`，徹底杜絕多任務間的狀態踩踏。
    * 雙 stack 的徹底解耦，使得運算資料與控制流程互不干擾，維持清晰的結構對稱性。
 
 #### Stack Effect 標記慣例

@@ -62,7 +62,6 @@ def _comment_paren(vm: VM) -> None:
 
 
 def create_vm(base_file: str | None = None) -> VM:
-    rstack = []
     vm = VM(host={"Constant": Constant, "Value": Value, "ForthError": ForthError})
     vm.host.update({
         "vm": vm,
@@ -70,7 +69,6 @@ def create_vm(base_file: str | None = None) -> VM:
         "pop": vm.pop,
         "tos": vm.peek,
         "stack": vm.stack,
-        "rstack": rstack,
         "comma": vm.comma,
     })
     # Comments support

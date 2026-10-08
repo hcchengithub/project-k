@@ -239,6 +239,7 @@ class Task:
     def __init__(self, vm, steps):
         self.vm, self._steps = vm, steps
         self.inputs = []
+        self.rstack = []
         self.status, self.error = "ready", None
 
     def resume(self):
@@ -286,6 +287,53 @@ class _Frame:
         self.ip = 0
 
 
+class _RStackProxy:
+    """Proxy routing return stack operations to the active Task."""
+
+    def __init__(self, vm):
+        self._vm = vm
+
+    @property
+    def _current(self):
+        return self._vm.rstack
+
+    def append(self, item):
+        self._current.append(item)
+
+    def pop(self, *args):
+        try:
+            return self._current.pop(*args)
+        except IndexError:
+            raise ForthError("Return stack underflow") from None
+
+    def __getitem__(self, idx):
+        try:
+            return self._current[idx]
+        except IndexError:
+            raise ForthError("Return stack underflow") from None
+
+    def __setitem__(self, idx, val):
+        try:
+            self._current[idx] = val
+        except IndexError:
+            raise ForthError("Return stack underflow") from None
+
+    def __len__(self):
+        return len(self._current)
+
+    def __bool__(self):
+        return bool(self._current)
+
+    def __repr__(self):
+        try:
+            return repr(self._current)
+        except ForthError:
+            return "[]"
+
+    def clear(self):
+        self._current.clear()
+
+
 class VM:
     """Persistent working data and definitions, independent of other VMs."""
 
@@ -293,6 +341,7 @@ class VM:
         self.stack = []
         self.words = {}
         self.host = dict(host or {})
+        self.host.setdefault("rstack", _RStackProxy(self))
         self._active = []
         self._definition = None
         self._last = None
@@ -309,6 +358,12 @@ class VM:
         if not self._active or not self._active[-1].inputs:
             raise ForthError("No active input")
         return self._active[-1].inputs[-1]
+
+    @property
+    def rstack(self):
+        if not self._active:
+            raise ForthError("No active task")
+        return self._active[-1].rstack
 
     @property
     def compiling(self):

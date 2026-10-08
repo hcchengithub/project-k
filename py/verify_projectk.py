@@ -371,11 +371,51 @@ class ReplBootstrapTests(unittest.TestCase):
             self.vm.dictate("[\'] + ,")
 
     def test_return_stack(self):
-        self.vm.dictate('10 >r 20 >r r@')
-        self.assertEqual(self.vm.pop(), 20)
-        self.vm.dictate('r> r>')
+        self.vm.dictate('10 >r 20 >r r@ r> r>')
         self.assertEqual(self.vm.pop(), 10)
         self.assertEqual(self.vm.pop(), 20)
+        self.assertEqual(self.vm.pop(), 20)
+        # A new task has its own empty return stack; r> must underflow
+        with self.assertRaisesRegex(ForthError, 'Return stack underflow'):
+            self.vm.dictate('r>')
+
+    def test_return_stack_task_private_isolation(self):
+        # Task 1 pushes to return stack and pauses
+        task1 = self.vm.dictate('10 >r 20 >r pause r> r>')
+        self.assertEqual(task1.status, 'paused')
+        self.assertEqual(task1.rstack, [10, 20])
+
+        # Task 2 runs independently with its own return stack
+        self.vm.dictate('999 >r r@ r>')
+        self.assertEqual(self.vm.pop(), 999)
+        self.assertEqual(self.vm.pop(), 999)
+
+        # Task 1's rstack was not touched by Task 2
+        self.assertEqual(task1.rstack, [10, 20])
+
+        # Resume Task 1 and verify it pops its own values
+        task1.resume()
+        self.assertEqual(task1.status, 'done')
+        self.assertEqual(self.vm.pop(), 10)
+        self.assertEqual(self.vm.pop(), 20)
+
+    def test_for_next_task_isolation(self):
+        # Task 1 pauses inside for...next loop
+        task1 = self.vm.dictate(': pause-loop 2 for r@ pause next ; pause-loop')
+        self.assertEqual(task1.status, 'paused')
+        self.assertEqual(task1.rstack, [2])
+
+        # Task 2 runs its own for...next loop to completion while Task 1 is paused
+        self.vm.dictate(': other-loop 0 3 for r@ + next ; other-loop')
+        self.assertEqual(self.vm.pop(), 6)  # 3+2+1 = 6
+
+        # Task 1's loop counter is completely unharmed
+        self.assertEqual(task1.rstack, [2])
+        task1.resume()
+        self.assertEqual(task1.status, 'paused')
+        self.assertEqual(task1.rstack, [1])
+        task1.resume()
+        self.assertEqual(task1.status, 'done')
 
     def test_if_else_then(self):
         self.vm.dictate(': check-gt 10 > if 100 else 200 then ;')
