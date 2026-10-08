@@ -6,11 +6,7 @@ import pathlib
 import unittest
 
 from projectk import VM, Input, ForthError, DEMO
-
-_loader = importlib.machinery.SourceFileLoader('f_mod', str(pathlib.Path(__file__).parent / 'f'))
-_spec = importlib.util.spec_from_file_location('f_mod', str(pathlib.Path(__file__).parent / 'f'), loader=_loader)
-_f_mod = importlib.util.module_from_spec(_spec)
-_loader.exec_module(_f_mod)
+import repl as _f_mod
 Constant = _f_mod.Constant
 Value = _f_mod.Value
 
@@ -53,6 +49,32 @@ class KernelTests(unittest.TestCase):
         self.assertEqual(source.read(until='\n'), ' first line')
         self.assertEqual(source.read(until='|'), 'several\nlines')
         self.assertEqual(source.read(), 'tail')
+        self.assertIsNone(source.read())
+
+    def test_input_tib_itib_and_pad(self):
+        # 1. Normal single-string input initially has tib=[string], itib=0
+        source = Input(": square dup * ; 5 square")
+        self.assertEqual(source.tib, [": square dup * ; 5 square"])
+        self.assertEqual(source.itib, 0)
+
+        # 2. Reading triggers dynamic split into consumed tib[0] and pending tib[1] (itib=1)
+        self.assertEqual(source.read(), ":")
+        self.assertEqual(source.itib, 1)
+        self.assertEqual(source.tib[0], ":")
+        self.assertTrue(source.tib[1].startswith(" square"))
+
+        # Consume up to '5'
+        while source.read() != "5":
+            pass
+
+        # 3. Dynamic PAD injection behind itib: tib[2]
+        source.tib.append(". cr")
+        self.assertEqual(len(source.tib), 3)
+
+        # 4. Finish current element, then seamlessly advance into PAD
+        self.assertEqual(source.read(), "square")
+        self.assertEqual(source.read(), ".")
+        self.assertEqual(source.read(), "cr")
         self.assertIsNone(source.read())
 
     def test_composition_and_capture(self):

@@ -1,2 +1,2 @@
 @echo off
-python "%~dp0f" %*
+python "%~dp0repl.py" %*
