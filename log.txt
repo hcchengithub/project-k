@@ -410,10 +410,24 @@
 		Count is the number of most recent user-initiated chat turns. Mode is "json", "chat", or None.
 		json returns all API items in those turns; chat and None return user/assistant text messages.	
 
-[ ] 19:21 2026/10/09 ask() 
+[ ] 23:39 2026/10/09
+	我們已經有這個 forth word : (ai) 
+	為什麼還需要這個: (ai-request) 
 	
+[ ] 23:40 2026/10/09
+	我希望我們的 repl 有兩種模式，一個是 chat mode，一個是 forth mode。
+	Chat mode 的 prompt 是這樣子 'chat>'，然後 forth mode 就是 'forth>'  本來的 '>' 就被取代掉了。
+	當 forth mode 的時候，功能不變；但是當 chat mode 的時候，直接跟 AI 對話，不用每次 prefix 'ai:' 
+	
+[ ] 23:58 2026/10/09
+	念念不忘，讓 Forth Language 來幫忙下 command line
+	--
+	f -c foo bar 這個已經有了
+	f -c 希望還能夠繼續接著談!!
 
 
+
+[ ]
 [ ]
 [ ]
 [ ]

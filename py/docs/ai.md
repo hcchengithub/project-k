@@ -18,8 +18,9 @@ Keep `.env` private. The local bridge sends the API key only as the HTTPS bearer
 
 ## Forth interface
 
+- The REPL starts in Forth mode with the `forth> ` prompt. `chat` and `forth` are Forth words (`see chat`, `see forth`) that switch modes. In Chat mode, each submitted buffer is sent directly to the current AI session without an `ai:` prefix, and the prompt changes to `chat> `. Multiline editing and submission work the same in both modes; `bye` and Ctrl-D exit the REPL.
 - `ai: <prompt>` sends the complete submitted input buffer after `ai:` and streams the reply in the terminal. The buffer may contain multiple lines.
-- `(ai) ( prompt-string -- response-string )` consumes a string and pushes the response, for example: `s" Give me a short greeting" (ai) . cr`.
+- `(ai) ( prompt-string stream? -- [response-string] )` runs one AI turn. Use `false` to push the reply as a string, for example: `s" Give me a short greeting" false (ai) . cr`; use `true` to stream the reply to the terminal. `ai:` is the convenient streaming form.
 - `ai-status` displays the session selected by this running `f` process, if any. Each new `f` starts without an active session.
 - `ai-sessions` fetches the remote session list, newest first, refreshes `.ai_session.json` with the current full session IDs while preserving titles, and assigns sequence numbers for management words. It shows a local title when one is set, the final 8 characters of the session ID, and the API's creation and last-active times. The displayed sequence is a snapshot; run this again to refresh it.
 - `n ai-session` retrieves and displays status, model, environment, timestamps, and token usage for a listed session.

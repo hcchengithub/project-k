@@ -393,12 +393,12 @@ class ReplBootstrapTests(unittest.TestCase):
         self.assertIsNone(self.vm.tick("(ai-line)"))
 
         ai_stack = self.vm.tick("(ai)")
-        self.assertIn("prompt-string -- response-string", ai_stack.help)
-        self.assertIn("data stack", ai_stack.comment)
+        self.assertIn("prompt-string stream?", ai_stack.help)
+        self.assertIn("stream? true", ai_stack.comment)
 
     def test_ai_workflow_words_are_defined_in_ai_f(self):
         for name in ("ai-sessions", "ai-session", "ai-use", "ai-containers",
-                     "ai-container", "ai-cleanup", "ai-cancel", "(ai-request)",
+                     "ai-container", "ai-cleanup", "ai-cancel", "(ai)",
                      "(ai-context)", "system_info", "run_pwsh", "run_bash",
                      "run_curl", "run_http"):
             word = self.vm.tick(name)
@@ -579,6 +579,7 @@ class ReplBootstrapTests(unittest.TestCase):
         self.assertEqual(self.vm.pop(), 25)
 
     def test_multiline_ai_prompt_is_preserved_as_one_message(self):
+        self.vm.host["repl_mode"] = "chat"
         state = {"in_code_block": False, "code_buffer": [], "ai_task": None}
         received = []
 
@@ -591,9 +592,176 @@ class ReplBootstrapTests(unittest.TestCase):
 
         with patch.object(_f_mod.ai_bridge, "_create_session", side_effect=fake_create):
             with contextlib.redirect_stdout(io.StringIO()):
-                _f_mod._process_one_line(self.vm, "ai: First line.\nSecond line.", state)
+                _f_mod._process_repl_input(self.vm, "First line.\nSecond line.", state)
 
         self.assertEqual(received, ["First line.\nSecond line."])
+
+    def test_repl_mode_commands_switch_between_chat_and_forth(self):
+        state = {"in_code_block": False, "code_buffer": [], "ai_task": None}
+        self.assertIsNotNone(self.vm.tick("chat"))
+        self.assertIsNotNone(self.vm.tick("forth"))
+        with contextlib.redirect_stdout(io.StringIO()):
+            _f_mod._process_repl_input(self.vm, "chat", state)
+        self.assertEqual(self.vm.host["repl_mode"], "chat")
+        with contextlib.redirect_stdout(io.StringIO()):
+            _f_mod._process_repl_input(self.vm, "forth", state)
+        self.assertEqual(self.vm.host["repl_mode"], "forth")
+
+    def test_cli_execute_joins_every_remaining_argument_as_tib(self):
+        class RecordingVM:
+            def __init__(self):
+                self.sources = []
+
+            def dictate(self, source):
+                self.sources.append(source)
+
+        vm = RecordingVM()
+        with patch.object(_f_mod, "create_vm", return_value=vm), \
+                patch.object(_f_mod, "repl") as interactive_repl:
+            result = _f_mod.main(["-e", "1", "2", "+", ".", "-i"])
+        self.assertEqual(result, 0)
+        self.assertEqual(vm.sources, ["1 2 + . -i"])
+        interactive_repl.assert_not_called()
+
+    def test_cli_interactive_option_runs_after_execute(self):
+        class RecordingVM:
+            def __init__(self):
+                self.sources = []
+
+            def dictate(self, source):
+                self.sources.append(source)
+
+        vm = RecordingVM()
+        with patch.object(_f_mod, "create_vm", return_value=vm), \
+                patch.object(_f_mod, "repl") as interactive_repl:
+            result = _f_mod.main(["-i", "-e", "1", "2", "+", "."])
+        self.assertEqual(result, 0)
+        self.assertEqual(vm.sources, ["1 2 + ."])
+        interactive_repl.assert_called_once_with(vm)
+
+    def test_cli_chat_joins_prompt_and_invokes_ai_word(self):
+        class RecordingVM:
+            def __init__(self):
+                self.host = {}
+                self.stack = []
+                self.task = object()
+                self.executed = None
+
+            def push(self, value):
+                self.stack.append(value)
+
+            def tick(self, name):
+                return name
+
+            def execute(self, word):
+                self.executed = (word, self.stack[:])
+                self.stack.clear()
+                return self.task
+
+        vm = RecordingVM()
+        sessions = [
+            {"id": "sess_created_latest", "status": "idle", "last_active_at": 100},
+            {"id": "sess_active_latest", "status": "idle", "last_active_at": 250},
+        ]
+        with patch.object(_f_mod, "create_vm", return_value=vm), \
+                patch.object(_f_mod.ai_bridge, "_list_remote_sessions", return_value=sessions), \
+                patch.object(_f_mod, "repl") as interactive_repl:
+            result = _f_mod.main(["--chat", "Hello", "from", "CLI"])
+        self.assertEqual(result, 0)
+        self.assertEqual(vm.executed, ("(ai)", ["Hello from CLI", True]))
+        self.assertEqual(vm.host["repl_mode"], "chat")
+        self.assertEqual(vm.host["ai_active_session_id"], "sess_active_latest")
+        self.assertIs(vm.host["ai_session_rows"], sessions)
+        interactive_repl.assert_called_once_with(
+            vm, initial_task=vm.task, exit_when_idle=True, show_greeting=False)
+
+    def test_cli_chat_interactive_flag_must_precede_prompt(self):
+        class RecordingVM:
+            def __init__(self):
+                self.host = {}
+                self.stack = []
+                self.task = object()
+                self.executed = None
+
+            def push(self, value):
+                self.stack.append(value)
+
+            def tick(self, name):
+                return name
+
+            def execute(self, word):
+                self.executed = (word, self.stack[:])
+                self.stack.clear()
+                return self.task
+
+        vm = RecordingVM()
+        with patch.object(_f_mod, "create_vm", return_value=vm), \
+                patch.object(_f_mod.ai_bridge, "_list_remote_sessions", return_value=[]), \
+                patch.object(_f_mod, "repl") as interactive_repl:
+            result = _f_mod.main(["-i", "-c", "Hello", "there"])
+        self.assertEqual(result, 0)
+        self.assertEqual(vm.executed, ("(ai)", ["Hello there", True]))
+        interactive_repl.assert_called_once_with(
+            vm, initial_task=vm.task, exit_when_idle=False, show_greeting=False)
+
+    def test_cli_new_chat_skips_session_lookup(self):
+        class RecordingVM:
+            def __init__(self):
+                self.host = {}
+                self.stack = []
+                self.task = object()
+
+            def push(self, value):
+                self.stack.append(value)
+
+            def tick(self, name):
+                return name
+
+            def execute(self, word):
+                self.executed = (word, self.stack[:])
+                self.stack.clear()
+                return self.task
+
+        vm = RecordingVM()
+        with patch.object(_f_mod, "create_vm", return_value=vm), \
+                patch.object(_f_mod.ai_bridge, "_list_remote_sessions") as list_sessions, \
+                patch.object(_f_mod, "repl") as interactive_repl:
+            result = _f_mod.main(["-new", "-c", "A", "fresh", "chat"])
+        self.assertEqual(result, 0)
+        self.assertEqual(vm.executed, ("(ai)", ["A fresh chat", True]))
+        self.assertNotIn("ai_active_session_id", vm.host)
+        list_sessions.assert_not_called()
+        interactive_repl.assert_called_once_with(
+            vm, initial_task=vm.task, exit_when_idle=True, show_greeting=False)
+
+    def test_one_shot_chat_exits_without_repl_greeting_or_farewell(self):
+        class QuietPromptSession:
+            def __init__(self, **kwargs):
+                pass
+
+        class CompletedTask:
+            status = "done"
+
+        output = io.StringIO()
+        with patch.object(_f_mod, "PromptSession", QuietPromptSession), \
+                patch.object(_f_mod, "_make_multiline_key_bindings", return_value=None), \
+                patch.object(_f_mod.ai_bridge, "refresh_session_index") as refresh, \
+                patch.object(_f_mod, "_farewell") as farewell, \
+                contextlib.redirect_stdout(output):
+            _f_mod.repl(self.vm, initial_task=CompletedTask(), exit_when_idle=True,
+                        show_greeting=False)
+        self.assertEqual(output.getvalue(), "")
+        refresh.assert_called_once_with(self.vm)
+        farewell.assert_not_called()
+
+    def test_cli_help_is_available(self):
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            result = _f_mod.main(["-h"])
+        self.assertEqual(result, 0)
+        self.assertIn("-e <Forth tokens...>", output.getvalue())
+        self.assertIn("-i, --interactive", output.getvalue())
+        self.assertIn("-new, --new-session", output.getvalue())
 
     def test_stack_ai_word_returns_assistant_text(self):
         def fake_create(payload):
@@ -605,6 +773,7 @@ class ReplBootstrapTests(unittest.TestCase):
         with patch.object(_f_mod.ai_bridge, "_create_session", side_effect=fake_create), \
                 contextlib.redirect_stdout(io.StringIO()):
             self.vm.push("Say hello")
+            self.vm.push(False)
             self.vm.dictate("(ai)")
         self.assertEqual(self.vm.pop(), "Hello")
 

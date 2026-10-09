@@ -68,17 +68,26 @@ py\f.cmd
 
 ---
 
-### 2. 單行表達式測試（免進入 REPL）
+### 2. 命令列執行與互動模式
 
-使用 `-e` (evaluate expression) 參數直接在終端機求值：
+`-e` 會把後面所有命令列參數依序以一個空格接起來，當成單一 TIB 執行；預設執行完就結束。使用 `-i` 可在執行後保留 VM，進入 REPL。`-c` 或 `--chat` 會把後面所有參數以一個空格接成 prompt，直接交給 `(ai)`，並接續 `last_active_at` 最新的 idle session；若沒有 session 就建立一個。加上 `-new` 可強制建立新 session。預設完成後結束，也可在前面加 `-i` 繼續互動。`-h` 顯示完整說明：
 
 ```bash
 # Linux / WSL
-python3 py/repl.py -e '10 20 + . cr s" Hello Project K!" . cr bye'
+python3 py/repl.py -e 10 20 + . cr
+python3 py/repl.py -i -e 10 20 + . cr
+python3 py/repl.py -c 'What is 10 plus 20?'
+python3 py/repl.py -new -c 'Start a separate conversation'
+python3 py/repl.py -i --chat 'What is 10 plus 20?'
+python3 py/repl.py -h
 
 # Windows
-python py\repl.py -e "50 50 + . cr bye"
+python py\repl.py -e 50 50 + . cr
+python py\repl.py -i -e 50 50 + . cr
+python py\repl.py -c "What is 10 plus 20?"
 ```
+
+`-i` 單獨使用會直接開啟互動 REPL；也可以放在 Forth 檔案路徑前後，例如 `f -i program.f`。`-e` 和 `-c` 後方的所有參數分別屬於 Forth 輸入與 AI prompt，因此需要互動時，請把 `-i` 放在它們前面。也可以把含空格或 shell 特殊字元的內容用引號包起來。
 
 ---
 

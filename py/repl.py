@@ -142,6 +142,24 @@ def _process_one_line(vm: VM, line: str, state: dict) -> None:
         print(" ok")
 
 
+def _process_repl_input(vm: VM, line: str, state: dict) -> None:
+    """Route one submitted buffer according to the active REPL mode."""
+
+    command = line.strip().casefold()
+    if command in {"chat", "forth"} and vm.tick(command):
+        _process_one_line(vm, command, state)
+        return
+    if command == "bye":
+        _process_one_line(vm, line, state)
+        return
+    if vm.host.get("repl_mode", "forth") == "chat":
+        if not line.strip():
+            return
+        _process_one_line(vm, "ai: " + line, state)
+    else:
+        _process_one_line(vm, line, state)
+
+
 def _farewell(vm: VM) -> None:
     print("\nbye")
     try:
@@ -157,6 +175,30 @@ def _farewell(vm: VM) -> None:
         print(f'To resume it in a future Forth run, enter: s" {session_id}" ai-use')
     else:
         print("No AI session is selected in this Forth run.")
+
+
+def _latest_idle_session(rows):
+    candidates = []
+    for index, row in enumerate(rows):
+        if row.get("status") not in (None, "idle"):
+            continue
+        try:
+            last_active = float(row.get("last_active_at"))
+        except (TypeError, ValueError, OverflowError):
+            last_active = float("-inf")
+        candidates.append((last_active, -index, row))
+    return max(candidates, default=(None, None, None))[2]
+
+
+def _refresh_quiet_session_index(vm: VM) -> None:
+    rows = vm.host.get("ai_session_rows")
+    if rows is None:
+        ai_bridge.refresh_session_index(vm)
+        return
+    session_id = ai_bridge._saved_session(vm)
+    if session_id and not any(row.get("id") == session_id for row in rows):
+        rows.insert(0, {"id": session_id})
+    ai_bridge._sync_session_index(rows)
 
 
 def _make_multiline_key_bindings(bindings_type=None):
@@ -185,7 +227,8 @@ def _map_extended_enter_sequences(sequence_map, newline_key):
         sequence_map[sequence] = newline_key
 
 
-def repl(vm: VM | None = None) -> None:
+def repl(vm: VM | None = None, initial_task=None, *, exit_when_idle: bool = False,
+         show_greeting: bool = True) -> None:
     if vm is None:
         vm = create_vm()
 
@@ -206,17 +249,27 @@ def repl(vm: VM | None = None) -> None:
     )
     confirmation_session = PromptSession(multiline=False)
 
-    print("Project K Forth REPL")
-    print("Enter submits; Ctrl+J or Esc then Enter adds a line. Shift+Enter depends on terminal support.")
-    print("Type 'words' to list words, 'ai:' to ask AI, or 'bye'/Ctrl-D to exit.\n")
+    if show_greeting:
+        print("Project K Forth REPL")
+        print("Enter submits; Ctrl+J or Esc then Enter adds a line. Shift+Enter depends on terminal support.")
+        print("Type 'chat' for direct AI chat, 'forth' for Forth, or 'bye'/Ctrl-D to exit.\n")
 
-    state = {"in_code_block": False, "code_buffer": [], "ai_task": None,
+    vm.host.setdefault("repl_mode", "forth")
+    state = {"in_code_block": False, "code_buffer": [], "ai_task": initial_task,
              "queued": deque(), "displayed_approval": None}
 
     while True:
         try:
             pending = vm.host.get("ai_pending_approval")
             cleanup = vm.host.get("ai_cleanup_pending")
+            task = state.get("ai_task")
+            if (exit_when_idle and not pending and not cleanup and not state["queued"]
+                    and (task is None or task.status in {"done", "aborted", "failed"})):
+                try:
+                    _refresh_quiet_session_index(vm)
+                except Exception as err:
+                    print(f"Could not refresh the local AI session list: {err}", file=sys.stderr)
+                break
             if pending:
                 call_id = pending["action"].get("call_id")
                 if state["displayed_approval"] != call_id:
@@ -233,11 +286,11 @@ def repl(vm: VM | None = None) -> None:
                           "Type delete or cancel: ")
             elif state["queued"]:
                 raw_input = state["queued"].popleft()
-                _process_one_line(vm, raw_input, state)
+                _process_repl_input(vm, raw_input, state)
                 continue
             else:
                 prompt = ("... " if state["in_code_block"] or vm.compiling else
-                          "> ")
+                          ("chat> " if vm.host.get("repl_mode", "forth") == "chat" else "forth> "))
             active_prompt = confirmation_session if pending or cleanup else prompt_session
             raw_input = active_prompt.prompt(prompt)
 
@@ -304,7 +357,7 @@ def repl(vm: VM | None = None) -> None:
             if state["queued"]:
                 state["queued"].append(clean_input)
             else:
-                _process_one_line(vm, clean_input, state)
+                _process_repl_input(vm, clean_input, state)
 
         except ForthError as err:
             print(f"Error: {err}")
@@ -338,31 +391,140 @@ def repl(vm: VM | None = None) -> None:
             break
 
 
-def main() -> None:
+def _print_cli_help(file=None) -> None:
+    print("""Usage: f [-h] [-i] [-e <Forth tokens...> | -c <prompt tokens...> | <file.f>]
+
+Run Project K Forth source or start the interactive REPL.
+
+Options:
+  -h, --help         Show this help message and exit
+  -i, --interactive  Enter the REPL after executing source or completing chat
+  -e <tokens...>     Execute all remaining command-line tokens as one TIB,
+                     joined with one space between tokens
+  -c, --chat         Send all remaining command-line tokens as one prompt to AI,
+                     joined with one space; continue the most recently active idle session
+  -new, --new-session Start a new session instead of continuing one with -c
+
+With no source argument, the REPL starts. A .f file is executed as one source
+buffer. Put -i before -e or -c when you want to continue interactively; all
+tokens after -e or -c belong to that Forth input or AI prompt.""", file=file)
+
+
+def main(argv=None) -> int:
+    args = list(sys.argv[1:] if argv is None else argv)
+    if not args:
+        repl(create_vm())
+        return 0
+
+    interactive = False
+    source = None
+    chat_prompt = None
+    force_new_session = False
+    source_file = None
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg in ("-h", "--help"):
+            _print_cli_help()
+            return 0
+        if arg in ("-i", "--interactive"):
+            interactive = True
+            index += 1
+            continue
+        if arg in ("-new", "--new-session"):
+            force_new_session = True
+            index += 1
+            continue
+        if arg in ("-e", "--execute"):
+            if source_file is not None:
+                print("Error: -e cannot be combined with a source file.", file=sys.stderr)
+                _print_cli_help(sys.stderr)
+                return 2
+            source = " ".join(args[index + 1:])
+            if not source:
+                print("Error: -e requires Forth input.", file=sys.stderr)
+                _print_cli_help(sys.stderr)
+                return 2
+            index = len(args)
+            break
+        if arg in ("-c", "--chat"):
+            if source_file is not None:
+                print("Error: -c cannot be combined with a source file.", file=sys.stderr)
+                _print_cli_help(sys.stderr)
+                return 2
+            chat_prompt = " ".join(args[index + 1:])
+            if not chat_prompt:
+                print("Error: -c requires an AI prompt.", file=sys.stderr)
+                _print_cli_help(sys.stderr)
+                return 2
+            index = len(args)
+            break
+        if arg.startswith("-"):
+            print(f"Unknown option: {arg}", file=sys.stderr)
+            _print_cli_help(sys.stderr)
+            return 2
+        if source_file is not None:
+            print(f"Unexpected argument: {arg}", file=sys.stderr)
+            _print_cli_help(sys.stderr)
+            return 2
+        source_file = arg
+        index += 1
+
+    if source is None and source_file is not None:
+        if not os.path.isfile(source_file):
+            print(f"Forth source file not found: {source_file}", file=sys.stderr)
+            return 2
+        try:
+            with open(source_file, "r", encoding="utf-8") as source_handle:
+                source = source_handle.read()
+        except OSError as err:
+            print(f"Could not read {source_file}: {err}", file=sys.stderr)
+            return 1
+
+    if force_new_session and chat_prompt is None:
+        print("Error: -new applies only to -c/--chat.", file=sys.stderr)
+        _print_cli_help(sys.stderr)
+        return 2
+
     vm = create_vm()
-    if len(sys.argv) > 1:
-        arg = sys.argv[1]
-        if arg == "-e" and len(sys.argv) > 2:
-            expr = sys.argv[2]
+    if chat_prompt is not None:
+        vm.host["repl_mode"] = "chat"
+        if not force_new_session:
             try:
-                vm.dictate(expr)
-            except ForthError as err:
+                sessions = ai_bridge._list_remote_sessions()
+            except RuntimeError as err:
                 print(f"Error: {err}", file=sys.stderr)
-                sys.exit(1)
-        elif os.path.isfile(arg):
-            with open(arg, "r", encoding="utf-8") as f:
-                content = f.read()
-            try:
-                vm.dictate(content)
-            except ForthError as err:
-                print(f"Error: {err}", file=sys.stderr)
-                sys.exit(1)
-        else:
-            print(f"Unknown argument or file not found: {arg}", file=sys.stderr)
-            sys.exit(1)
-    else:
+                return 1
+            vm.host["ai_session_rows"] = sessions
+            if sessions:
+                latest = _latest_idle_session(sessions)
+                if latest is None:
+                    print("Error: No idle AI session is available to continue. "
+                          "Use -new -c to start a fresh session.", file=sys.stderr)
+                    return 1
+                vm.host["ai_active_session_id"] = latest["id"]
+        try:
+            vm.push(chat_prompt)
+            vm.push(True)
+            task = vm.execute(vm.tick("(ai)"))
+        except ForthError as err:
+            print(f"Error: {err}", file=sys.stderr)
+            return 1
+        repl(vm, initial_task=task, exit_when_idle=not interactive, show_greeting=False)
+        return 0
+    if source is None:
         repl(vm)
+        return 0
+
+    try:
+        vm.dictate(source)
+    except ForthError as err:
+        print(f"Error: {err}", file=sys.stderr)
+        return 1
+    if interactive:
+        repl(vm)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -16,15 +16,17 @@
 python py\repl.py
 ```
 
-看到 `Project K Forth REPL` 和 `>` 提示字元後，就可以輸入 Forth。離開請輸入 `bye`，或在 Linux / WSL 按 `Ctrl+D`。
+看到 `Project K Forth REPL` 和 `forth>` 提示字元後，就可以輸入 Forth。離開請輸入 `bye`，或在 Linux / WSL 按 `Ctrl+D`。
 
 不進互動介面也能直接執行一段程式：
 
 ```bash
-python3 py/repl.py -e '10 20 + . cr bye'
+python3 py/repl.py -e 10 20 + . cr
 ```
 
 預期會印出 `30`。以下 Forth 範例請在 REPL 中逐段輸入（每個程式碼區塊視為一次輸入），或整理成 `.f` 檔再執行；用 `-e` 時，請將需解析行尾的 `py>>` 放在該次輸入的最後一行。
+
+若想執行後繼續使用同一個 VM，可在 `-e` 前加 `-i`：`python3 py/repl.py -i -e 10 20 + . cr`。`-e` 後的所有參數會以單一空格連接成一份 TIB；`-h` 可查看命令列說明。
 
 ## 2. 關鍵觀念：Forth 使用後綴順序
 

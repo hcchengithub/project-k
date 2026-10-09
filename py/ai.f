@@ -24,6 +24,18 @@ code ai-confirm
 end-code
 // ( -- ) Require approval for each AI Forth program again.
 
+code chat
+    vm.host["repl_mode"] = "chat"
+end-code
+// ( -- ) Switch the REPL to direct AI chat input.
+/// In Chat mode, each submitted buffer is sent to the active AI session.
+
+code forth
+    vm.host["repl_mode"] = "forth"
+end-code
+// ( -- ) Switch the REPL to Forth input.
+/// In Forth mode, submitted buffers are evaluated as Forth source.
+
 code system_info
     import ai_tools
 
@@ -152,15 +164,17 @@ end-code
 // ( request-mapping -- response ) Send one HTTP/HTTPS request.
 /// Request fields: url (required), method (default GET), headers (string mapping), and body (optional string).
 
-code (ai-request)
+code (ai)
     import ai_bridge
     import json
     import os
 
-    push_response = vm.pop()
+    stream_response = vm.pop()
     prompt = vm.pop()
     if not isinstance(prompt, str):
         raise RuntimeError("(ai) expects a string on the data stack.")
+    if not isinstance(stream_response, bool):
+        raise RuntimeError("(ai) expects a Boolean output mode after the prompt string.")
     prompt = prompt.strip()
     if not prompt:
         raise RuntimeError("ai: needs a prompt on the same line.")
@@ -197,9 +211,7 @@ code (ai-request)
             kind = event.get("type", "")
             if kind == "agent.session.turn.output_text.delta":
                 text = event.get("delta", "")
-                if push_response:
-                    answer.append(text)
-                else:
+                if stream_response:
                     if text and not ai_started:
                         print()
                         ai_started = True
@@ -208,14 +220,16 @@ code (ai-request)
                             print("🤖 ", end="")
                         print(part, end="", flush=True)
                         ai_line_start = part.endswith("\n") or part.endswith("\r")
-            elif kind == "agent.session.turn.output_text.done":
-                if push_response:
-                    answer[:] = [event.get("text", "")]
                 else:
+                    answer.append(text)
+            elif kind == "agent.session.turn.output_text.done":
+                if stream_response:
                     if ai_started and not ai_line_start:
                         print()
                     ai_started = False
                     ai_line_start = True
+                else:
+                    answer[:] = [event.get("text", "")]
             elif kind == "agent.session.requires_action":
                 session_status, actions = ai_bridge._current_actions(session_id)
                 if session_status != "requires_action":
@@ -298,17 +312,15 @@ code (ai-request)
         raise
     if not session_id:
         raise RuntimeError("Agents API stream ended without returning the new session ID.")
-    if push_response:
+    if not stream_response:
         vm.push("".join(answer))
 end-code
-// ( prompt-string push-response? -- [response-string] ) Run one AI turn; stream or return its text.
+// ( prompt-string stream? -- [response-string] ) Run one AI turn; stream or return its text.
 /// Local Forth tool calls pause for the REPL's Trust/Yes/No/Cancel approval flow.
 
-: (ai) true (ai-request) ;
-// ( prompt-string -- response-string ) Ask the selected AI session and push its text reply.
-/// Returns the AI's user-facing text on the data stack.
+/// stream? true prints the reply; false pushes it as a string.
 
-: ai: s" " word false (ai-request) ; immediate
+: ai: s" " word true (ai) ; immediate
 // ( <prompt> -- ) Send the remaining input as a prompt to the current AI session.
 /// The response streams to the terminal. Proposed Forth programs pause for approval.
 /// Trust approves later proposals for this Forth process; ai-confirm restores per-proposal approval.
