@@ -511,9 +511,58 @@ end-code
 // ( -- char ) Push a blank space character ' '.
 /// Constant providing the space string ' '.
 
+code int
+    vm.push(int(vm.pop()))
+end-code
+// ( value -- integer ) Convert a value to a Python integer.
+/// Uses Python's built-in int() conversion.
+
+code float
+    vm.push(float(vm.pop()))
+end-code
+// ( value -- float ) Convert a value to a Python floating-point number.
+/// Uses Python's built-in float() conversion.
+
+code true
+    vm.push(True)
+end-code
+// ( -- flag ) Push Python's True value.
+
+code false
+    vm.push(False)
+end-code
+// ( -- flag ) Push Python's False value.
+
+code none
+    vm.push(None)
+end-code
+// ( -- None ) Push Python's None value.
+
+code ""
+    vm.push("")
+end-code
+// ( -- string ) Push an empty string.
+
+code inf
+    vm.push(float("inf"))
+end-code
+// ( -- number ) Push positive floating-point infinity.
+
+code -inf
+    vm.push(float("-inf"))
+end-code
+// ( -- number ) Push negative floating-point infinity.
+
+code nan
+    vm.push(float("nan"))
+end-code
+// ( -- number ) Push a floating-point NaN value.
+
 code word
     delim = vm.pop()
-    if delim in (" ", "", None) or delim == "\\s":
+    if not delim:
+        val = vm.input.rest()
+    elif delim == " " or delim == "\\s":
         val = vm.input.read()
     elif delim == chr(10) or delim == "\\n":
         val = vm.input.read(until=chr(10)) if chr(10) in vm.input.tib[vm.input.itib] else vm.input.rest()
@@ -522,9 +571,10 @@ code word
     vm.push(val if val is not None else "")
 end-code
 // ( delim -- string ) Read input text until the specified delimiter.
+/// If delim is falsy (None, empty string, False, or 0), consume all remaining TIB.
 /// If delim is space, read the next whitespace-delimited word.
 /// If delim is newline, read until the end of the line.
-/// Otherwise read until the delimiter character.
+/// Otherwise read until the delimiter.
 
 code '
     name = vm.input.read()
@@ -571,6 +621,27 @@ end-code
 immediate
 // ( <name> -- ) Compile the next immediate word into the definition.
 /// Force compiling an immediate word as a normal operation instead of executing it.
+
+code alias
+    target = vm.pop()
+    if not hasattr(target, "action") or not isinstance(getattr(target, "name", None), str):
+        raise ForthError("alias expects a word on the stack.")
+    alias_name = vm.input.read()
+    if alias_name is None:
+        raise ForthError("Expected a name after alias.")
+    vm.define(alias_name, (target,), immediate=target.immediate,
+              source=f": {alias_name} {target.name} ;",
+              help=target.help, comment=target.comment, type="alias")
+end-code
+immediate
+// ( word <alias-name> -- ) Define an alias for an existing word.
+/// Usage: ' true alias True. The alias executes the original word.
+
+' true alias True
+' false alias False
+' none alias None
+' inf alias infinity
+' -inf alias -infinity
 
 : begin     here ; immediate
 // ( -- addr ) Mark the start of an indefinite loop.
@@ -625,6 +696,18 @@ code last
 end-code
 // ( -- word ) Push the most recently defined word object onto the stack.
 /// Return vm.last().
+
+code perform
+    word = vm.pop()
+    yield from vm.call(word)
+end-code
+// ( word -- ... ) Execute a word object from the data stack.
+/// Dispatch the word through the current VM task so stack effects and pauses are preserved.
+
+: execute perform ;
+// ( word -- ... ) Execute the word object on the data stack.
+/// Commonly used as `last execute` to run the most recently defined word.
+
 code <py>
     import re
     curr = vm.input.tib[vm.input.itib]
@@ -875,9 +958,3 @@ code bye
 end-code
 // ( -- ) Exit the Forth process.
 /// Terminate execution immediately via SystemExit(0).
-
-code cls
-    print("\x1b[2J\x1b[H", end="", flush=True)
-end-code
-// ( -- ) Clear the visible terminal screen and move the cursor to the top-left.
-/// Output ANSI escape sequences; requires an ANSI-compatible terminal.

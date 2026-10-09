@@ -144,7 +144,7 @@ python3 py/verify_projectk.py
 python py\verify_projectk.py
 ```
 
-目前套件包含 53 項自動化測試。
+目前套件包含 65 項自動化測試。
 
 ---
 ## 📂 檔案角色分工一覽
@@ -153,10 +153,13 @@ python py\verify_projectk.py
 
 | 檔案 | 適用環境 | 角色與內容說明 |
 | :--- | :--- | :--- |
-| `repl.py` | 跨平台 (Python 3) | **REPL 核心進入點**。負責初始化 VM、載入 `base.f`、多行代碼緩衝處理，以及命令列引數解析 (`-e` 或指定檔案)。 |
-| `base.f` | 純 Forth 原始碼 | **核心字典正本 (Bootstrap)**。約 870 行純 Forth 程式碼，包含控制結構、字串家族、Defining Words、`see` 等，由 `repl.py` 啟動時自動加載。 |
+| `repl.py` | 跨平台 (Python 3) | **REPL 核心進入點**。負責初始化 VM、載入 `base.f`、`auxiliary.f` 和 `ai.f`、多行代碼緩衝處理，以及命令列引數解析 (`-e` 或指定檔案)。 |
+| `base.f` | 純 Forth 原始碼 | **核心字典正本 (Bootstrap)**。包含控制結構、字串家族、Defining Words、`see` 等核心 words，由 `repl.py` 啟動時載入。 |
+| `auxiliary.f` | Forth 擴充 | **輔助工具 words**。包含以 Forth `code` 直接定義的 `cls` 和 `stringify`。 |
+| `ai.f` | Forth 擴充 | **AI words 與流程**。以 `code` 和 colon words 定義 Agents API 的對話、工具交握、核准及 session 操作；傳輸與少量 Python host 功能由 `ai_bridge.py` 提供。 |
+| `ai_bridge.py` | Python 標準函式庫 | **AI 基礎 host 功能**。負責 HTTP/SSE、API 請求、session index 檔案，以及 Forth 執行輸出擷取。 |
 | `projectk.py` | 跨平台 (Python 3) | **微核心 VM 引擎**。定義 `VM`、雙 stack 容器、`Task` 狀態機、`_Word` 資料結構，以及 Python 原生代碼塊解析器。 |
-| `verify_projectk.py` | 跨平台 (Python 3) | **自動化驗證套件**。涵蓋 53 項測試。 |
+| `verify_projectk.py` | 跨平台 (Python 3) | **自動化驗證套件**。涵蓋 69 項測試。 |
 | `f.sh` | Linux / WSL | **Linux/WSL 啟動腳本**。解析符號連結，從 `PROJECTK_VENV` 選擇 Python 環境。 |
 | `f.cmd` / `f.bat` | Windows | **Windows 啟動腳本**。呼叫 PATH 上的 `python`；外部 VENV 需先啟用。 |
 

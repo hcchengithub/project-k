@@ -2,8 +2,10 @@ import contextlib
 import importlib.machinery
 import importlib.util
 import io
+import math
 import pathlib
 import unittest
+from unittest.mock import patch
 
 from projectk import VM, Input, ForthError, DEMO
 import repl as _f_mod
@@ -272,6 +274,246 @@ class ReplBootstrapTests(unittest.TestCase):
     def setUp(self):
         self.vm = _f_mod.create_vm()
 
+    def test_auxiliary_stringify_is_defined_directly_in_forth_source(self):
+        stringify = self.vm.tick("stringify")
+        self.assertIsNotNone(stringify)
+        self.assertIn("json.dumps", stringify.source)
+
+        self.vm.push({"answer": [42]})
+        self.vm.dictate("stringify")
+        self.assertEqual(self.vm.pop(), '{\n  "answer": [\n    42\n  ]\n}')
+
+        self.vm.push("{'answer': 42}")
+        self.vm.dictate("stringify")
+        self.assertEqual(self.vm.pop(), '{\n  "answer": 42\n}')
+
+    def test_cls_is_defined_directly_in_forth_source_and_clears_terminal(self):
+        cls = self.vm.tick("cls")
+        self.assertIn("print(\"\\x1b[2J\\x1b[H\"", cls.source)
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.vm.dictate("cls")
+        self.assertEqual(output.getvalue(), "\x1b[2J\x1b[H")
+
+    def test_ai_local_control_words_are_defined_and_work_from_ai_f(self):
+        for name in ("ai-new", "ai-status", "ai-confirm"):
+            self.assertIsNotNone(self.vm.tick(name))
+            self.assertTrue(self.vm.tick(name).source.strip())
+        self.assertIn('pop("ai_active_session_id"', self.vm.tick("ai-new").source)
+        self.assertIn("ai_active_session_id", self.vm.tick("ai-status").source)
+        self.assertIn('pop("ai_trusted"', self.vm.tick("ai-confirm").source)
+
+        bridge = _f_mod.ai_bridge
+        other_vm = _f_mod.create_vm()
+        self.vm.host["ai_active_session_id"] = "sess_current_12345678"
+        other_vm.host["ai_active_session_id"] = "sess_other_abcdefgh"
+        with patch.object(bridge, "_session_titles", return_value={"sess_current_12345678": "Project K"}):
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                self.vm.dictate("ai-status")
+            self.assertIn("Project K [12345678]", output.getvalue())
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.vm.dictate("ai-new")
+            self.assertNotIn("ai_active_session_id", self.vm.host)
+            self.assertEqual(other_vm.host["ai_active_session_id"], "sess_other_abcdefgh")
+
+            self.vm.host["ai_session_rows"] = [{"id": "sess_selected_87654321"}]
+            with patch.object(bridge, "_api_get", return_value={}), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                self.vm.dictate("1 ai-use")
+            self.assertEqual(self.vm.host["ai_active_session_id"], "sess_selected_87654321")
+            self.assertEqual(other_vm.host["ai_active_session_id"], "sess_other_abcdefgh")
+
+        remote = [{"id": "sess_selected_abcdefgh"}]
+        with patch.object(bridge, "_list_remote_sessions", return_value=remote), \
+                patch.object(bridge, "_api_get", return_value={}), \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.vm.dictate('s" abcdefgh" ai-use')
+        self.assertEqual(self.vm.host["ai_active_session_id"], "sess_selected_abcdefgh")
+
+    def test_bye_refreshes_session_index_and_prints_resume_command(self):
+        bridge = _f_mod.ai_bridge
+        self.vm.host["ai_active_session_id"] = "sess_current_12345678"
+        output = io.StringIO()
+        with patch.object(bridge, "refresh_session_index") as refresh, \
+                patch.object(bridge, "_session_title", return_value="Project K"), \
+                contextlib.redirect_stdout(output):
+            _f_mod._farewell(self.vm)
+        refresh.assert_called_once_with(self.vm)
+        self.assertIn("Current AI session: Project K [12345678]", output.getvalue())
+        self.assertIn('s" sess_current_12345678" ai-use', output.getvalue())
+
+        self.vm.host["ai_trusted"] = True
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.vm.dictate("ai-confirm")
+        self.assertNotIn("ai_trusted", self.vm.host)
+
+    def test_session_title_reader_ignores_legacy_fields(self):
+        bridge = _f_mod.ai_bridge
+        original = '{"active_session_id":"legacy","sessions":[{"id":"sess_1","title":"Design","last_used_at":"old"}]}'
+
+        class ReadOnlyFile:
+            name = ".ai_session.json"
+
+            def read_text(self, encoding=None):
+                return original
+
+        session_file = ReadOnlyFile()
+        with patch.object(bridge, "SESSION_FILE", session_file):
+            self.assertEqual(bridge._session_titles(), {"sess_1": "Design"})
+            self.assertEqual(session_file.read_text(encoding="utf-8"), original)
+
+    def test_ai_sessions_display_title_cloud_times_and_short_id(self):
+        bridge = _f_mod.ai_bridge
+        remote = [{"id": "sess_full_12345678", "created_at": 1791466592,
+                   "last_active_at": 1791470192, "status": "idle",
+                   "agent": {"model": "gpt-test"}, "environment": {"type": "none"}}]
+        saved = []
+        with patch.object(bridge, "_list_remote_sessions", return_value=remote), \
+                patch.object(bridge, "_session_titles", return_value={"sess_full_12345678": "Design chat"}), \
+                patch.object(bridge, "_write_session_index", side_effect=lambda rows: saved.extend(rows)):
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                self.vm.dictate("ai-sessions")
+        rendered = output.getvalue()
+        self.assertIn("Design chat [12345678]", rendered)
+        self.assertNotIn("sess_full_12345678", rendered)
+        self.assertIn("Started:", rendered)
+        self.assertIn("Last active:", rendered)
+        self.assertEqual(saved, [{"id": "sess_full_12345678", "title": "Design chat"}])
+
+    def test_ai_words_have_visible_source_and_help(self):
+        ai_line = self.vm.tick("ai:")
+        self.assertIsNotNone(ai_line)
+        self.assertIsInstance(ai_line.action, tuple)
+        self.assertTrue(any(getattr(word, "name", None) == "word" for word in ai_line.action))
+        self.assertIn("remaining input", ai_line.help)
+        self.assertIn("Trust", ai_line.comment)
+        self.assertIsNone(self.vm.tick("(ai-line)"))
+
+        ai_stack = self.vm.tick("(ai)")
+        self.assertIn("prompt-string -- response-string", ai_stack.help)
+        self.assertIn("data stack", ai_stack.comment)
+
+    def test_ai_workflow_words_are_defined_in_ai_f(self):
+        for name in ("ai-sessions", "ai-session", "ai-use", "ai-containers",
+                     "ai-container", "ai-cleanup", "ai-cancel", "(ai-request)",
+                     "(ai-context)"):
+            word = self.vm.tick(name)
+            self.assertIsNotNone(word, name)
+            self.assertTrue(word.source.strip(), name)
+
+    def test_ai_context_returns_chat_or_complete_items(self):
+        bridge = _f_mod.ai_bridge
+        context_word = self.vm.tick("ai-context")
+        self.assertIsInstance(context_word.action, tuple)
+        action_names = [getattr(operation, "name", None) for operation in context_word.action]
+        self.assertIn("BL", action_names)
+        self.assertIn("int", action_names)
+        self.vm.host["ai_session_rows"] = [{"id": "sess_1"}]
+        items = [
+            {"id": "item_1", "type": "message", "role": "user",
+             "content": [{"type": "input_text", "text": "Hello"}]},
+            {"id": "item_2", "type": "function_call", "name": "projectk_words"},
+            {"id": "item_3", "type": "message", "role": "assistant",
+             "content": [{"type": "output_text", "text": "Hi there."}]},
+        ]
+        api_page = {"data": list(reversed(items)), "has_more": False, "last_id": "item_1"}
+        with patch.object(bridge, "_api_get", return_value=api_page):
+            self.vm.dictate("ai-context 1 5")
+            self.assertEqual(self.vm.pop(), [
+                {"role": "user", "text": "Hello"},
+                {"role": "assistant", "text": "Hi there."},
+            ])
+
+            self.vm.dictate("ai-context 1 5 chat")
+            self.assertEqual(self.vm.pop(), [
+                {"role": "user", "text": "Hello"},
+                {"role": "assistant", "text": "Hi there."},
+            ])
+
+            self.vm.dictate("ai-context 1 5 json")
+            self.assertEqual(self.vm.pop(), items)
+
+        self.assertIsNone(self.vm.tick("ai-transcript"))
+        self.assertIsNone(self.vm.tick("ai-items"))
+
+    def test_ai_context_fetches_only_recent_turn_pages(self):
+        bridge = _f_mod.ai_bridge
+        pages = [
+            {"data": [
+                {"id": "a3", "type": "message", "role": "assistant"},
+                {"id": "u3", "type": "message", "role": "user"},
+                {"id": "tool3", "type": "function_call"},
+                {"id": "a2", "type": "message", "role": "assistant"},
+            ], "has_more": True, "last_id": "a2"},
+            {"data": [
+                {"id": "u2", "type": "message", "role": "user"},
+                {"id": "a1", "type": "message", "role": "assistant"},
+                {"id": "u1", "type": "message", "role": "user"},
+            ], "has_more": False, "last_id": "u1"},
+        ]
+        requests = []
+
+        def api_get(path):
+            requests.append(path)
+            return pages.pop(0)
+
+        self.vm.host["ai_session_rows"] = [{"id": "sess_1"}]
+        with patch.object(bridge, "_api_get", side_effect=api_get):
+            self.vm.dictate("ai-context 1 2 json")
+            recent = self.vm.pop()
+
+        self.assertEqual([item["id"] for item in recent], ["u2", "a2", "tool3", "u3", "a3"])
+        self.assertEqual(len(requests), 2)
+        self.assertIn("order=desc", requests[0])
+        self.assertIn("limit=4", requests[0])
+
+    def test_word_uses_falsy_delimiters_for_all_remaining_input(self):
+        for delimiter in (None, "", False, 0):
+            self.vm.push(delimiter)
+            self.vm.dictate("word remaining\nlines")
+            self.assertEqual(self.vm.pop(), " remaining\nlines")
+
+        self.vm.dictate("BL word first")
+        self.assertEqual(self.vm.pop(), "first")
+
+    def test_int_and_float_convert_values_on_the_stack(self):
+        self.vm.push("42")
+        self.vm.dictate("int")
+        self.assertEqual(self.vm.pop(), 42)
+
+        self.vm.push("3.125")
+        self.vm.dictate("float")
+        self.assertEqual(self.vm.pop(), 3.125)
+
+    def test_python_value_words_and_peforth_aliases(self):
+        self.vm.dictate("none None")
+        self.assertIsNone(self.vm.pop())
+        self.assertIsNone(self.vm.pop())
+
+        self.vm.dictate("true True false False")
+        self.assertIs(self.vm.pop(), False)
+        self.assertIs(self.vm.pop(), False)
+        self.assertIs(self.vm.pop(), True)
+        self.assertIs(self.vm.pop(), True)
+
+        self.vm.dictate('""')
+        self.assertEqual(self.vm.pop(), "")
+
+        self.vm.dictate("inf infinity -inf -infinity nan")
+        self.assertTrue(math.isnan(self.vm.pop()))
+        self.assertEqual(self.vm.pop(), float("-inf"))
+        self.assertEqual(self.vm.pop(), float("-inf"))
+        self.assertEqual(self.vm.pop(), float("inf"))
+        self.assertEqual(self.vm.pop(), float("inf"))
+
+    def test_alias_defines_an_alias_for_a_colon_word(self):
+        self.vm.dictate(": original 17 ; ' original alias original-alias original-alias")
+        self.assertEqual(self.vm.pop(), 17)
+        self.assertEqual(self.vm.tick("original-alias").type, "alias")
+
     def test_multiline_editor_submission_runs_as_one_forth_buffer(self):
         state = {"in_code_block": False, "code_buffer": [], "ai_task": None}
         with contextlib.redirect_stdout(io.StringIO()):
@@ -282,20 +524,31 @@ class ReplBootstrapTests(unittest.TestCase):
         state = {"in_code_block": False, "code_buffer": [], "ai_task": None}
         received = []
 
-        def fake_ask(vm, prompt):
-            received.append(prompt)
-            yield {"kind": "text", "text": "First line.\nSecond line."}
-            yield {"kind": "text_done", "text": "First line.\nSecond line."}
+        def fake_create(payload):
+            received.append(payload["input"])
+            yield {"type": "agent.session.created", "session": {"id": "sess_new"}}
+            yield {"type": "agent.session.turn.output_text.delta", "delta": "First line.\nSecond line."}
+            yield {"type": "agent.session.turn.output_text.done", "text": "First line.\nSecond line."}
+            yield {"type": "agent.session.turn.completed"}
 
-        original_ask = _f_mod.ai_bridge.ask
-        _f_mod.ai_bridge.ask = fake_ask
-        try:
+        with patch.object(_f_mod.ai_bridge, "_create_session", side_effect=fake_create):
             with contextlib.redirect_stdout(io.StringIO()):
                 _f_mod._process_one_line(self.vm, "ai: First line.\nSecond line.", state)
-        finally:
-            _f_mod.ai_bridge.ask = original_ask
 
         self.assertEqual(received, ["First line.\nSecond line."])
+
+    def test_stack_ai_word_returns_assistant_text(self):
+        def fake_create(payload):
+            yield {"type": "agent.session.created", "session": {"id": "sess_stack"}}
+            yield {"type": "agent.session.turn.output_text.delta", "delta": "Hello"}
+            yield {"type": "agent.session.turn.output_text.done", "text": "Hello"}
+            yield {"type": "agent.session.turn.completed"}
+
+        with patch.object(_f_mod.ai_bridge, "_create_session", side_effect=fake_create), \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.vm.push("Say hello")
+            self.vm.dictate("(ai)")
+        self.assertEqual(self.vm.pop(), "Hello")
 
     def test_multiline_key_bindings_submit_and_insert_newlines(self):
         class RecordingBindings:
@@ -358,6 +611,10 @@ class ReplBootstrapTests(unittest.TestCase):
         self.vm.dictate(': sample 42 . ; last')
         w = self.vm.pop()
         self.assertEqual(w.name, 'sample')
+
+    def test_last_execute_runs_the_most_recent_definition(self):
+        self.vm.dictate(': sample 41 1 + ; last execute')
+        self.assertEqual(self.vm.pop(), 42)
 
     def test_colon_colon_and_colon_greater(self):
         self.vm.dictate(": hi s\" Hello!\" . ; s\" Custom\" ' hi :: help=pop(1)")

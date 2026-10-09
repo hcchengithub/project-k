@@ -132,8 +132,10 @@ flowchart TD
 | 組件檔案 | 定位 | 職責與邊界 |
 | :--- | :--- | :--- |
 | `projectk.py` | 核心 VM 引擎 | 包含 `Input` 串流解析器、`_Word` 核心結構、`Task` 狀態機、`VM` 容器，以及原生 Python 代碼塊 (`code ... end-code`) 的語彙編譯機制。不預載任何高階 Forth 詞彙，純粹、輕量且原生支援 Coroutines。 |
-| `base.f` | Bootstrap 字典 | 以純粹的 Forth 語法撰寫之字典正本（800+ 行）。從 `code immediate` 起步，逐步自舉出控制結構、字串家族、Defining Words、`does>`、三階段 `see` 與 Python Host Bridge。各 Word 透過 `//` 與 `///` 內建完整說明文檔。 |
-| `repl.py` | 執行期與 REPL | 負責環境裝配、`prompt_toolkit` 多行輸入與編輯、整段貼上緩衝、`code` 多行緩衝區收集，以及全域 CLI 進入點。 |
+| `base.f` | Bootstrap 字典 | 以 Forth 撰寫的核心字典，包含控制結構、字串家族、Defining Words、`does>`、三階段 `see` 與 Python Host Bridge。 |
+| `auxiliary.f` | 輔助字典 | Forth 優先的非核心工具 words，例如 `cls` 和 `stringify`。 |
+| `ai.f` / `ai_bridge.py` | AI 擴充 | `ai.f` 以 Forth code words 與 colon words 實作 AI 介面及主要流程；`ai_bridge.py` 保留標準函式庫 HTTP/SSE 傳輸、session index 檔案等 Python 基礎功能。 |
+| `repl.py` | 執行期與 REPL | 負責環境裝配、載入 `base.f`、安裝 host primitives、載入 `auxiliary.f` 與 `ai.f`，以及 REPL 輸入處理。 |
 | `f.sh` / `f.cmd` / `f.bat` | 平台啟動器 | `f.sh` 讀取 `PROJECTK_VENV` 並使用 Linux/WSL VENV；Windows launcher 呼叫 PATH 上的 `python`，須由 Windows Python 環境提供 `prompt_toolkit`。 |
 
 ---
@@ -1090,7 +1092,9 @@ Project K 的代碼組織貫徹高內聚、低耦合原則：
        ├── py/
        │   ├── projectk.py      (純粹微核心 VM 引擎，~560 行)
        │   ├── repl.py          (REPL 介面與 CLI 啟動入口，~190 行)
-       │   ├── base.f           (純 Forth Bootstrap 字典，~870 行)
+       │   ├── base.f           (核心 Forth Bootstrap 字典)
+       │   ├── auxiliary.f      (Forth 輔助 words)
+       │   ├── ai.f            (AI 使用者介面 words)
        │   ├── verify_projectk.py (自動化單元驗證套件)
        │   ├── f.sh             (Linux / WSL 啟動腳本)
        │   ├── f.cmd / f.bat    (Windows 本地啟動腳本)
@@ -1135,7 +1139,7 @@ Shift+Enter 只有在終端提供可區分的按鍵序列時才能使用。部�
 
 系統品質由 `verify_projectk.py` 進行嚴密的持續整合驗證。
 
-套件涵蓋 **53 項自動化測試**：
+套件涵蓋 **65 項自動化測試**：
 * 基礎算術與大整數 / 浮點數精度
 * Data stack 與 Return stack 邊界與溢位保護
 * Colon 定義與 Immediate Word 編譯期行為

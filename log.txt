@@ -261,7 +261,8 @@
     etc 
 [ ] 12:47 2026-10-06 用 AI 倒推成 SPEC，然後再回頭實現出來。
     最近在學會 LINE 群討論到用 AI 做比較正經的事情時，要讓它先寫 conceptual SPEC，然後寫 implementation plan.
-    昨天 2026.10.04 禮拜天，我在計程車上想到：那要不然就請 AI 幫我把 peforce 的 kernel project-k 現有的 kernel code 反推回 SPEC，然後再實作回來，看看效果怎麼樣。
+    昨天 2026.10.04 禮拜天，我在計程車上想到：那要不然就請 AI 幫我把 peforce 的 kernel project-k 現有的 kernel code 
+	反推回 SPEC，然後再實作回來，看看效果怎麼樣。
     因為那時候我才剛開始學 Python，一直覺得原本的 code 寫得不是很好。結果在計程車上，這些事情說著說著初版就已經完成了！
     以下我把 AI 幫我寫好的 SPEC、展開回來的 Python source code，以及它裡面有一個非常有意思的新 word 叫 "pause" 請 AI 講解清楚。。。。
     --
@@ -271,7 +272,7 @@
     13:12 2026-10-06
     試試看倒推 projectK.js
 
-[ ] 09:19 2026/10/09 project K, AI container 隨時都在吃錢！
+[X] 09:19 2026/10/09 project K, AI container 隨時都在吃錢！
 	(misc) hcchen@Desktop-Jianfu:~$ f
 	Project K Forth REPL
 	Type 'words' to list words, 'ai: <prompt>' to ask AI, or 'bye'/Ctrl-D to exit.
@@ -373,7 +374,7 @@
 	  "phase": "final_answer"
 	}
 	 ok
-	> ai-status <-- [ ] 應該要順便看這個 session 有沒有 container 
+	> ai-status <-- [X] 應該要順便看這個 session 有沒有 container 
 	Active AI session: sess_0622767e7305d828006ac83e406ba88193836e4ea1a9019abf
 	Locally indexed sessions: 1
 	 ok
@@ -381,8 +382,37 @@
 	Error: ai-container: Container number must be between 1 and 0.
 	>	
 
-[ ] 09:28 2026/10/09 確認 Project K Agents API 沒有再繼續 container 扣錢
+[X] 09:28 2026/10/09 確認 Project K Agents API 沒有再繼續 container 扣錢
 	https://platform.openai.com/settings/organization/usage
+
+[ ] 19:17 2026/10/09 AI 很喜歡用 .py
+	儘量把 ai_bridge.py 裡面可以改成 colon word, and code word 的，儘量都搬到 ai.f 去。
+	code word 可以 import 那 .py 裡面寫好 basic functions 以後，幾乎其他的都可以寫
+	成 code word 然後 colon words 啦。
+
+[X] 19:19 2026/10/09 .ai_session.json 
+	.ai_session.json 是個 common file 變成大家都共用! 
+	那如果同時跑好幾個 f 的話會怎麼樣？ AI 會都撞在一起!
+	21:51 2026/10/09
+	ai-context n count 
+	returns user/assistant text for the latest count user-initiated turns; mode defaults 
+	to chat. ai-context n count chat is equivalent, while ai-context n count json 
+	returns all API items, including tool calls and results, within those turns. 
+	The API is queried newest-first and pagination stops once it has found the requested number 
+	of turns. Both forms leave the object on the Forth data stack; use stringify . to print it. 
+	count must be positive. Run ai-sessions first to refresh the sequence numbers.
+
+[X] 20:44 2026/10/09 
+    ai-transcript ai-items <--- 合併成 ai-context ( [--json | --chat] -- object ) Default 是 --chat
+	--> 這個是用 ChatGPT 在幫我做
+	--
+	(ai-context) ( session-number count mode -- object ) Return recent API items or chat messages for a session.
+		Count is the number of most recent user-initiated chat turns. Mode is "json", "chat", or None.
+		json returns all API items in those turns; chat and None return user/assistant text messages.	
+
+[ ] 19:21 2026/10/09 ask() 
+	
+
 
 [ ]
 [ ]

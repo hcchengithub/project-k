@@ -75,8 +75,8 @@ API key 僅用於本機 Host 向 OpenAI API 驗證，不放入 skill、plugin ZI
 
 | 檔案 | 預計職責 |
 | --- | --- |
-| py/ai.f | 使用者可見的 Forth words、stack effect 與介面 |
-| py/ai_bridge.py | 標準函式庫 HTTP/SSE、session ID、API 事件及 function tool 交握 |
+| py/ai.f | 使用者可見的 Forth words、stack effect、session 操作、turn flow、工具交握與本機核准流程 |
+| py/ai_bridge.py | 標準函式庫 HTTP/SSE、API 傳輸、session index 檔案、skill 載入及本機 Forth 輸出擷取等基礎功能 |
 | py/skills/projectk-forth/SKILL.md | AI 使用 Forth、查詢字典與提交程式的技能說明 |
 | py/skills/projectk-forth 參考資料 | 從 Project K 文件精選的 Forth 操作與語言說明 |
 | py/plugins/projectk-forth/.codex-plugin/plugin.json | Agent Plugin 描述，將 skill 打包提供給 hosted session |

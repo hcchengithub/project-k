@@ -1,30 +1,446 @@
-\ Project K AI words are registered by ai_bridge.install(vm) during REPL startup.
-\ This file documents the stable Forth-facing interface and its stack effects.
-\
-\ ai: <prompt> ( -- )
-\   Send all text after ai: in the submitted input buffer to the saved Agents API session.
-\   While the agent works, its local Forth execution proposal pauses the VM
-\   until the REPL receives trust/yes/no/cancel input from the user.
-\   Trust approves later AI programs for this Forth process only.
-\
-\ (ai) ( prompt-string -- response-string )
-\   Ask the current agent with a string from the data stack. Local Forth
-\   proposals still pass through the REPL's approval prompt.
-\
-\ ai-status ( -- )  Display the active session ID and local history count.
-\ ai-new    ( -- )  Start a fresh conversation on the next AI request; keep history.
-\ ai-sessions ( -- ) List remote sessions, newest first; numbers select entries.
-\ ai-session ( n -- ) Show session details.
-\ ai-use ( n -- ) Select a remote session for follow-up chat.
-\ ai-transcript ( n -- ) Show user/assistant text for a session.
-\ ai-items ( n -- ) Show all session items, including tool interactions.
-\ ai-containers ( -- ) List hosted environments associated with remote sessions.
-\ ai-container ( n -- ) Show hosted environment details from the latest list.
-\ ai-cleanup ( n -- ) Delete a remote session after explicit confirmation.
-\ ai-confirm ( -- ) Require approval for each AI Forth program again.
-\ ai-cancel ( -- )  Cancel the active Agents API turn.
-\
-\ The leading backslash is Project K's line-comment word. The host bridge
-\ defines the executable implementations so it can pause and resume Tasks.
+\ Forth-facing AI words and Agent turn control. ai_bridge.py provides transport helpers.
 
-: ai: (ai-line) ; immediate
+code ai-new
+    vm.host.pop("ai_active_session_id", None)
+    print("A fresh AI session will be created for this Forth process on its next request.")
+end-code
+// ( -- ) Clear this Forth process's selected AI session.
+
+code ai-status
+    import ai_bridge
+
+    active_id = vm.host.get("ai_active_session_id")
+    if active_id:
+        title = ai_bridge._session_title(active_id) or "(untitled)"
+        print(f"Active AI session: {title} [{ai_bridge._short_id(active_id)}]")
+    else:
+        print("Active AI session: none (next request creates a new session)")
+end-code
+// ( -- ) Show the AI session selected by this Forth process.
+
+code ai-confirm
+    vm.host.pop("ai_trusted", None)
+    print("AI Forth programs will require approval again.")
+end-code
+// ( -- ) Require approval for each AI Forth program again.
+
+code (ai-request)
+    import ai_bridge
+    import json
+    import os
+
+    push_response = vm.pop()
+    prompt = vm.pop()
+    if not isinstance(prompt, str):
+        raise RuntimeError("(ai) expects a string on the data stack.")
+    prompt = prompt.strip()
+    if not prompt:
+        raise RuntimeError("ai: needs a prompt on the same line.")
+
+    ai_bridge.load_dotenv()
+    tools = [
+        {"type": "function", "name": "projectk_search_words",
+         "description": "Search the current Forth dictionary and documentation.",
+         "parameters": {"type": "object", "properties": {"query": {"type": "string"}},
+                        "required": ["query"], "additionalProperties": False}},
+        {"type": "function", "name": "projectk_run_forth",
+         "description": "Propose Forth source for execution in the user's current local VM. The CLI applies its current approval mode.",
+         "parameters": {"type": "object", "properties": {"source": {"type": "string"}, "purpose": {"type": "string"}},
+                        "required": ["source", "purpose"], "additionalProperties": False}},
+    ]
+    payload = {
+        "agent": {"model": os.environ.get("PROJECTK_AI_MODEL", "gpt-6-astra"),
+                  "tools": tools, "instructions": ai_bridge._agent_instructions()},
+        "environment": {"type": "none"}, "input": prompt, "stream": True,
+    }
+    session_id = ai_bridge._saved_session(vm)
+    message = {"type": "agent.session.input.message", "input": [{"role": "user", "content": [
+        {"type": "input_text", "text": prompt}]}]}
+    events = ai_bridge._stream(session_id, message) if session_id else ai_bridge._create_session(payload)
+    answer = []
+    ai_started = False
+    ai_line_start = True
+    try:
+        for event in events:
+            if not session_id:
+                session_id = ai_bridge._session_id_from_event(event)
+                if session_id:
+                    vm.host["ai_active_session_id"] = session_id
+            kind = event.get("type", "")
+            if kind == "agent.session.turn.output_text.delta":
+                text = event.get("delta", "")
+                if push_response:
+                    answer.append(text)
+                else:
+                    if text and not ai_started:
+                        print()
+                        ai_started = True
+                    for part in text.splitlines(keepends=True):
+                        if ai_line_start:
+                            print("🤖 ", end="")
+                        print(part, end="", flush=True)
+                        ai_line_start = part.endswith("\n") or part.endswith("\r")
+            elif kind == "agent.session.turn.output_text.done":
+                if push_response:
+                    answer[:] = [event.get("text", "")]
+                else:
+                    if ai_started and not ai_line_start:
+                        print()
+                    ai_started = False
+                    ai_line_start = True
+            elif kind == "agent.session.requires_action":
+                session_status, actions = ai_bridge._current_actions(session_id)
+                if session_status != "requires_action":
+                    raise RuntimeError(
+                        f"Agents API signaled required action but session status is {session_status!r}."
+                    )
+                for action in actions:
+                    name = action.get("name")
+                    arguments = action.get("arguments", {})
+                    if isinstance(arguments, str):
+                        arguments = json.loads(arguments)
+                    if name == "projectk_search_words":
+                        terms = str(arguments.get("query", "")).casefold().split()
+                        matches = []
+                        for word_name, word in vm.words.items():
+                            help_text = str(getattr(word, "help", "") or "")
+                            comment = str(getattr(word, "comment", "") or "")
+                            source = str(getattr(word, "source", "") or "")
+                            searchable = f"{word_name} {help_text} {comment} {source}".casefold()
+                            if all(term in searchable for term in terms):
+                                matches.append({"name": word_name, "help": help_text,
+                                                "comment": comment, "source": source[:1200],
+                                                "immediate": bool(word.immediate)})
+                            if len(matches) >= 30:
+                                break
+                        ai_bridge._tool_result(session_id, action, True,
+                                               json.dumps(matches, ensure_ascii=False))
+                    elif name == "projectk_run_forth":
+                        proposal = {"kind": "approval", "action": action,
+                                    "source": str(arguments.get("source", "")),
+                                    "purpose": str(arguments.get("purpose", ""))}
+                        if vm.host.get("ai_trusted", False):
+                            print("\n🤖 AI proposes this Forth program (auto-approved for this Forth run):")
+                            print(f"Purpose: {proposal['purpose']}\n---\n{proposal['source']}\n---")
+                            approved = True
+                        else:
+                            vm.host["ai_pending_approval"] = proposal
+                            yield vm.pause()
+                            approval = vm.host.pop("ai_approval_result", False)
+                            if isinstance(approval, str) and approval.casefold() == "trust":
+                                vm.host["ai_trusted"] = True
+                                approved = True
+                            else:
+                                approved = bool(approval)
+                        if approved:
+                            status, still_pending = ai_bridge._current_actions(session_id)
+                            if status != "requires_action" or not any(
+                                    pending.get("call_id") == action.get("call_id")
+                                    for pending in still_pending):
+                                raise RuntimeError(
+                                    "This approval request expired before execution. "
+                                    "The Forth program was not run; please ask AI to propose it again."
+                                )
+                            execution = ai_bridge._run(vm, proposal["source"])
+                            try:
+                                ai_bridge._tool_result(session_id, action, True, execution)
+                            except Exception as exc:
+                                raise RuntimeError(
+                                    "The approved Forth program has already run locally, but the Agents API "
+                                    f"did not accept its result: {exc}. Check the local VM/output before retrying. "
+                                    f"Execution result: {execution}"
+                                ) from None
+                        else:
+                            ai_bridge._tool_result(session_id, action, False,
+                                                   error="User declined execution.")
+                    else:
+                        ai_bridge._tool_result(session_id, action, False,
+                                               error=f"Unknown function: {name}")
+            elif kind in ("error", "agent.session.failed", "agent.session.environment.failed",
+                          "agent.session.turn.failed"):
+                detail = event.get("error") or event.get("turn", {}).get("error") or event
+                raise RuntimeError(f"Agents API {kind}: {detail}")
+            elif kind == "agent.session.turn.completed":
+                break
+    except KeyboardInterrupt:
+        try:
+            ai_bridge.cancel_turn(vm)
+        except Exception:
+            pass
+        raise
+    if not session_id:
+        raise RuntimeError("Agents API stream ended without returning the new session ID.")
+    if push_response:
+        vm.push("".join(answer))
+end-code
+// ( prompt-string push-response? -- [response-string] ) Run one AI turn; stream or return its text.
+/// Local Forth tool calls pause for the REPL's Trust/Yes/No/Cancel approval flow.
+
+: (ai) true (ai-request) ;
+// ( prompt-string -- response-string ) Ask the selected AI session and push its text reply.
+/// Returns the AI's user-facing text on the data stack.
+
+: ai: s" " word false (ai-request) ; immediate
+// ( <prompt> -- ) Send the remaining input as a prompt to the current AI session.
+/// The response streams to the terminal. Proposed Forth programs pause for approval.
+/// Trust approves later proposals for this Forth process; ai-confirm restores per-proposal approval.
+
+code ai-sessions
+    import ai_bridge
+
+    rows = ai_bridge._list_remote_sessions()
+    titles = ai_bridge._sync_session_index(rows)
+    vm.host["ai_session_rows"] = rows
+    if not rows:
+        print("No remote sessions found.")
+    else:
+        active_id = ai_bridge._saved_session(vm)
+        print(f"Remote sessions: {len(rows)} (newest first)")
+        for index, row in enumerate(rows, 1):
+            env = row.get("environment") or {}
+            session_id = row.get("id") or ""
+            title = titles.get(session_id) or "(untitled)"
+            marker = " *" if session_id == active_id else ""
+            print(f"{index:>3}. {title} [{ai_bridge._short_id(session_id)}]{marker}")
+            print(f"     Started: {ai_bridge._format_time(row.get('created_at'))}  "
+                  f"Last active: {ai_bridge._format_time(row.get('last_active_at'))}")
+            print(f"     {row.get('status', 'unknown')}  "
+                  f"{(row.get('agent') or {}).get('model', 'unknown')}  env={env.get('type', 'unknown')}")
+end-code
+// ( -- ) Refresh the local session index and list remote sessions, newest first.
+
+code ai-session
+    import ai_bridge
+    import urllib.parse
+
+    index = vm.pop()
+    rows = vm.host.get("ai_session_rows")
+    if rows is None:
+        raise RuntimeError("Run ai-sessions first to refresh the remote list and its sequence numbers.")
+    if not isinstance(index, int) or isinstance(index, bool) or index < 1 or index > len(rows):
+        raise RuntimeError(f"No session number {index}; the current list has {len(rows)} entries.")
+    row = rows[index - 1]
+    detail = ai_bridge._api_get(f"/sessions/{urllib.parse.quote(row['id'], safe='')}")
+    agent = detail.get("agent") or {}
+    env = detail.get("environment") or {}
+    usage = detail.get("usage") or {}
+    session_id = detail.get("id") or row["id"]
+    title = ai_bridge._session_title(session_id) or "(untitled)"
+    print(f"Session {index}: {title} [{ai_bridge._short_id(session_id)}]")
+    print(f"Created: {ai_bridge._format_time(detail.get('created_at'))}")
+    print(f"Last active: {ai_bridge._format_time(detail.get('last_active_at'))}")
+    print(f"Status: {detail.get('status', 'unknown')}")
+    print(f"Model: {agent.get('model', 'unknown')}")
+    print(f"Environment: {env.get('type', 'unknown')} (id={env.get('id', 'none')}, "
+          f"size={env.get('container_size', 'n/a')})")
+    print(f"Usage: input={usage.get('input_tokens', 0)} output={usage.get('output_tokens', 0)} "
+          f"total={usage.get('total_tokens', 0)} tokens")
+    if detail.get("error"):
+        print(f"Error: {detail['error']}")
+end-code
+// ( session-number -- ) Show remote session details.
+
+code ai-use
+    import ai_bridge
+    import urllib.parse
+
+    choice = vm.pop()
+    if isinstance(choice, int) and not isinstance(choice, bool):
+        snapshot = vm.host.get("ai_session_rows") or []
+        if 1 <= choice <= len(snapshot):
+            row = snapshot[choice - 1]
+            label = str(choice)
+        else:
+            matches = [row for row in ai_bridge._list_remote_sessions()
+                       if ai_bridge._short_id(row.get("id")) == str(choice)]
+            if len(matches) != 1:
+                if not matches:
+                    raise RuntimeError(f"No session number or ID suffix matches {choice!r}.")
+                raise RuntimeError(f"Session ID suffix {choice!r} is ambiguous; use the full ID.")
+            row = matches[0]
+            label = str(choice)
+    elif isinstance(choice, str) and choice:
+        matches = [row for row in ai_bridge._list_remote_sessions()
+                   if row.get("id") == choice or ai_bridge._short_id(row.get("id")) == choice]
+        if len(matches) != 1:
+            if not matches:
+                raise RuntimeError(f"No remote session matches ID {choice!r}.")
+            raise RuntimeError(f"Session ID suffix {choice!r} is ambiguous; use the full ID.")
+        row = matches[0]
+        label = ai_bridge._short_id(row["id"])
+    else:
+        raise RuntimeError("ai-use expects a session number or session ID.")
+    ai_bridge._api_get(f"/sessions/{urllib.parse.quote(row['id'], safe='')}")
+    vm.host["ai_active_session_id"] = row["id"]
+    title = ai_bridge._session_title(row["id"]) or "(untitled)"
+    print(f"Using session {label}: {title} [{ai_bridge._short_id(row['id'])}]")
+end-code
+// ( session-number | session-ID -- ) Select a remote session for follow-up chat.
+
+code ai-containers
+    import ai_bridge
+    import urllib.parse
+
+    session_rows = vm.host.get("ai_session_rows")
+    if session_rows is None:
+        raise RuntimeError("Run ai-sessions first to refresh the remote session list.")
+    rows = []
+    for session in session_rows:
+        detail = ai_bridge._api_get(f"/sessions/{urllib.parse.quote(session['id'], safe='')}")
+        env = detail.get("environment") or {}
+        if env.get("type") != "openai_hosted" or not env.get("id"):
+            continue
+        try:
+            env_detail = ai_bridge._api_get(f"/environments/{urllib.parse.quote(env['id'], safe='')}")
+            status = env_detail.get("status", "unknown")
+        except RuntimeError as exc:
+            env_detail = {}
+            status = f"unavailable ({exc})"
+        rows.append({"session_id": session["id"], "environment_id": env["id"],
+                     "container_size": env.get("container_size"), "status": status,
+                     "details": env_detail})
+    vm.host["ai_container_rows"] = rows
+    if not rows:
+        print("No hosted environments are linked to the listed sessions.")
+    else:
+        print(f"Hosted environments linked to sessions: {len(rows)}")
+        for index, row in enumerate(rows, 1):
+            print(f"{index:>3}. env={row['environment_id']}  status={row['status']}  "
+                  f"size={row.get('container_size') or 'unknown'}  "
+                  f"session={ai_bridge._short_id(row['session_id'])}")
+end-code
+// ( -- ) List hosted environments linked to the current remote session snapshot.
+
+code ai-container
+    import ai_bridge
+    import json
+
+    index = vm.pop()
+    rows = vm.host.get("ai_container_rows")
+    if rows is None:
+        raise RuntimeError("Run ai-containers first to refresh the environment list.")
+    if not isinstance(index, int) or isinstance(index, bool) or index < 1 or index > len(rows):
+        raise RuntimeError(f"Container number must be between 1 and {len(rows)}.")
+    row = rows[index - 1]
+    print(f"Environment {index}: {row['environment_id']}")
+    print(f"Session: {ai_bridge._short_id(row['session_id'])}")
+    print(f"Status: {row['status']}")
+    print(json.dumps(row.get("details") or {}, ensure_ascii=False, indent=2))
+end-code
+// ( container-number -- ) Show hosted environment details.
+
+code ai-cleanup
+    import ai_bridge
+    import urllib.parse
+
+    index = vm.pop()
+    rows = vm.host.get("ai_session_rows")
+    if rows is None:
+        raise RuntimeError("Run ai-sessions first to refresh the remote list and its sequence numbers.")
+    if not isinstance(index, int) or isinstance(index, bool) or index < 1 or index > len(rows):
+        raise RuntimeError(f"No session number {index}; the current list has {len(rows)} entries.")
+    session_id = rows[index - 1]["id"]
+    print(f"This permanently deletes session {index}: {ai_bridge._short_id(session_id)} and its conversation.")
+    print("If it has a hosted sandbox, deletion also requests sandbox cleanup.")
+    print("Type 'delete' to confirm, or 'cancel' to keep the session.")
+    vm.host["ai_cleanup_pending"] = {"index": index, "session_id": session_id}
+    yield vm.pause()
+    approved = bool(vm.host.pop("ai_cleanup_result", False))
+    vm.host.pop("ai_cleanup_pending", None)
+    if not approved:
+        print("AI session kept.")
+    else:
+        result = ai_bridge._api_delete(f"/sessions/{urllib.parse.quote(session_id, safe='')}")
+        if result.get("deleted") is not True:
+            raise RuntimeError("Agents API did not confirm session deletion.")
+        if vm.host.get("ai_active_session_id") == session_id:
+            vm.host.pop("ai_active_session_id", None)
+        vm.host.pop("ai_session_rows", None)
+        vm.host.pop("ai_container_rows", None)
+        print("AI session deleted from the API; physical cleanup may continue asynchronously.")
+end-code
+// ( session-number -- ) Delete a remote session after explicit confirmation.
+
+code ai-cancel
+    import ai_bridge
+
+    if vm.host.get("ai_pending_approval"):
+        ai_bridge.cancel_turn(vm)
+        print("Sent an Agents API cancel request.")
+    else:
+        print("No AI task is waiting for local approval; use cancel at its confirmation prompt.")
+end-code
+// ( -- ) Cancel the active Agents API turn.
+
+code (ai-context)
+    import ai_bridge
+    import urllib.parse
+
+    mode = vm.pop()
+    if mode not in {None, "json", "chat"}:
+        raise RuntimeError("ai-context mode must be json, chat, or None.")
+    count = vm.pop()
+    if not isinstance(count, int) or isinstance(count, bool) or count < 1:
+        raise RuntimeError("ai-context count must be a positive integer.")
+    index = vm.pop()
+    rows = vm.host.get("ai_session_rows")
+    if rows is None:
+        raise RuntimeError("Run ai-sessions first to refresh the remote list and its sequence numbers.")
+    if not isinstance(index, int) or isinstance(index, bool) or index < 1 or index > len(rows):
+        raise RuntimeError(f"No item {index}; the current list has {len(rows)} entries.")
+    session_id = rows[index - 1]["id"]
+    items = []
+    after = ""
+    limit = min(100, max(2, count * 2))
+    user_messages = 0
+    while True:
+        query = urllib.parse.urlencode({"limit": limit, "order": "desc",
+                                        **({"after": after} if after else {})})
+        page = ai_bridge._api_get(
+            f"/sessions/{urllib.parse.quote(session_id, safe='')}/items?{query}")
+        page_items = page.get("data") or []
+        items.extend(page_items)
+        user_messages += sum(1 for item in page_items
+                             if item.get("type") == "message" and item.get("role") == "user")
+        if user_messages >= count:
+            recent = []
+            found = 0
+            for item in items:
+                recent.append(item)
+                if item.get("type") == "message" and item.get("role") == "user":
+                    found += 1
+                    if found == count:
+                        break
+            items = list(reversed(recent))
+            break
+        if not page.get("has_more") or not page.get("last_id") or page["last_id"] == after:
+            items.reverse()
+            break
+        after = page["last_id"]
+
+    if mode == "json":
+        vm.push(items)
+    else:
+        messages = []
+        for item in items:
+            if item.get("type") != "message" or item.get("role") not in {"user", "assistant"}:
+                continue
+            parts = []
+            for part in item.get("content") or []:
+                if isinstance(part, dict) and isinstance(part.get("text"), str):
+                    parts.append(part["text"])
+                elif isinstance(part, str):
+                    parts.append(part)
+            text = "".join(parts).strip()
+            if text:
+                messages.append({"role": item["role"], "text": text})
+        vm.push(messages)
+end-code
+// ( session-number count mode -- object ) Return recent API items or chat messages for a session.
+/// Count is the number of most recent user-initiated chat turns. Mode is "json", "chat", or None.
+/// json returns all API items in those turns; chat and None return user/assistant text messages.
+
+: ai-context BL word int BL word int BL word dup "" = if drop none then (ai-context) ; immediate
+// ( <session-number> <count> [mode] -- object ) Fetch recent context for a listed session.
+/// Count is a positive number of latest user-initiated chat turns. Mode defaults to chat.
+/// Run ai-sessions first. Example: ai-context 1 5 json stringify .

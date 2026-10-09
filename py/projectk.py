@@ -24,7 +24,7 @@ Run this file to see a system grow from its two initial words. Python code
 bodies run with normal host privileges. No third-party dependencies.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from inspect import isgenerator
 import io
 import re
@@ -164,6 +164,7 @@ class _Word:
     type: str = ""
     _value: object = None
     body: list = None
+    properties: dict = field(default_factory=dict, repr=False)
 
     @property
     def value(self):

@@ -24,6 +24,7 @@ except ImportError:
 
 from projectk import VM, ForthError
 import ai_bridge
+import ai_tools
 
 
 class Constant:
@@ -54,6 +55,7 @@ class Value:
 
 BASE_F_PATH = os.path.join(SCRIPT_DIR, "base.f")
 AI_F_PATH = os.path.join(SCRIPT_DIR, "ai.f")
+AUXILIARY_F_PATH = os.path.join(SCRIPT_DIR, "auxiliary.f")
 
 
 def _comment_line(vm: VM) -> None:
@@ -91,7 +93,9 @@ def create_vm(base_file: str | None = None) -> VM:
         vm.dictate(bootstrap)
     else:
         raise ForthError(f"Bootstrap file not found: {target_base}")
-    ai_bridge.install(vm)
+    ai_tools.install(vm)
+    with open(AUXILIARY_F_PATH, "r", encoding="utf-8") as f:
+        vm.dictate(f.read())
     if os.path.isfile(AI_F_PATH):
         with open(AI_F_PATH, "r", encoding="utf-8") as f:
             vm.dictate(f.read())
@@ -138,6 +142,23 @@ def _process_one_line(vm: VM, line: str, state: dict) -> None:
             print("Task: paused")
     elif not vm.compiling:
         print(" ok")
+
+
+def _farewell(vm: VM) -> None:
+    print("\nbye")
+    try:
+        ai_bridge.refresh_session_index(vm)
+    except Exception as err:
+        print(f"Could not refresh the local AI session list: {err}")
+
+    session_id = ai_bridge._saved_session(vm)
+    if session_id:
+        title = ai_bridge._session_title(session_id) or "(untitled)"
+        short_id = ai_bridge._short_id(session_id)
+        print(f"Current AI session: {title} [{short_id}]")
+        print(f'To resume it in a future Forth run, enter: s" {session_id}" ai-use')
+    else:
+        print("No AI session is selected in this Forth run.")
 
 
 def _make_multiline_key_bindings(bindings_type=None):
@@ -210,7 +231,7 @@ def repl(vm: VM | None = None) -> None:
                 print("Cancel: cancel this AI mission.")
                 prompt = "Run it? Type trust, yes, no, or cancel: "
             elif cleanup:
-                prompt = (f"Delete session {cleanup['index']} ({cleanup['session_id']})? "
+                prompt = (f"Delete session {cleanup['index']} ({ai_bridge._short_id(cleanup['session_id'])})? "
                           "Type delete or cancel: ")
             elif state["queued"]:
                 raw_input = state["queued"].popleft()
@@ -256,7 +277,7 @@ def repl(vm: VM | None = None) -> None:
                 elif choice in {"cancel", "ai-cancel"}:
                     task = state.get("ai_task")
                     try:
-                        ai_bridge.cancel_turn()
+                        ai_bridge.cancel_turn(vm)
                     except Exception as err:
                         print(f"Could not cancel remote turn: {err}")
                     if task:
@@ -297,7 +318,7 @@ def repl(vm: VM | None = None) -> None:
             print("\n<interrupted>")
             if vm.host.get("ai_pending_approval"):
                 try:
-                    ai_bridge.cancel_turn()
+                    ai_bridge.cancel_turn(vm)
                 except Exception as err:
                     print(f"Could not cancel remote turn: {err}")
             if vm.host.get("ai_pending_approval") or vm.host.get("ai_cleanup_pending"):
@@ -315,7 +336,7 @@ def repl(vm: VM | None = None) -> None:
             if vm.compiling:
                 vm._discard_definition()
         except (EOFError, SystemExit):
-            print("\nbye")
+            _farewell(vm)
             break
 
 

@@ -12,8 +12,9 @@ You are assisting with Project K's Python Edition, a small Forth VM hosted by Py
 - Forth uses postfix notation and a shared data stack. Words consume inputs from the top of the stack and leave results there.
 - The Python VM has a return stack used by control flow and supports Python objects on the Forth data stack.
 - Definitions made with `: name ... ;` are compiled into the current dictionary. The CLI's current VM persists definitions for the life of that process; the API session persists conversation only.
-- Project K extends the core through `base.f`. Word behavior and help text in the live dictionary are authoritative; query before assuming a word exists.
+- Project K loads core words from `base.f`, auxiliary words from `auxiliary.f`, and AI-facing words at startup. Word behavior and help text in the live dictionary are authoritative; query before assuming a word exists.
 - `code name ... end-code` defines host Python code and the `py:` / `py>>` bridge can invoke Python behavior. These capabilities can affect the user's machine, so never treat a Forth proposal as harmless merely because it is short.
+- Keep the AI feature's user-facing words and application flow in `ai.f`. Prefer colon definitions for Forth composition; put Python integration in visible `code` words there. Keep `ai_bridge.py` focused on reusable low-level HTTP/SSE, file, and host-interoperability helpers instead of adding Forth command behavior or turn orchestration.
 
 ## Working with the CLI
 
