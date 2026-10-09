@@ -12,7 +12,7 @@ PROJECTK_AI_MODEL=gpt-6-astra
 PROJECTK_AI_SKILLS_DIR=skills
 ```
 
-`PROJECTK_AI_MODEL` selects the Agents API model. `PROJECTK_AI_SKILLS_DIR` selects the directory containing `projectk-forth/SKILL.md`; a relative path resolves from the Python directory. The default is `py/skills`. The selected skill is packaged into an inline plugin ZIP when a new session is created. Existing sessions keep their original hosted environment; run `ai-new` after changing the plugin or skill to load the new bundle.
+`PROJECTK_AI_MODEL` selects the Agents API model. `PROJECTK_AI_SKILLS_DIR` selects the directory containing `projectk-forth/SKILL.md`; a relative path resolves from the Python directory. The default is `py/skills`. For new sessions, the skill and Forth reference are included in agent instructions because `environment.type: "none"` has no filesystem for loading a plugin. New sessions do not provision an OpenAI-hosted sandbox/container. Existing sessions keep their original configuration.
 
 Keep `.env` private. The local bridge sends the API key only as the HTTPS bearer credential. It does not put the key into the plugin, conversation, or tool result. The prompt and resulting conversation are sent to OpenAI's service according to the account's API data controls.
 
@@ -20,15 +20,23 @@ Keep `.env` private. The local bridge sends the API key only as the HTTPS bearer
 
 - `ai: <prompt>` sends the rest of the current line and streams the reply in the terminal.
 - `(ai) ( prompt-string -- response-string )` consumes a string and pushes the response, for example: `s" Give me a short greeting" (ai) . cr`.
-- `ai-status` displays the saved local session ID, if one exists.
-- `ai-new` removes the local session ID. The next AI request creates a new hosted session. It does not delete a remote session.
+- `ai-status` displays the active session ID and the number of locally indexed sessions.
+- `ai-sessions` fetches the remote session list, newest first, and assigns sequence numbers for management words. The displayed sequence is a snapshot; run this again to refresh it.
+- `n ai-session` retrieves and displays status, model, environment, timestamps, and token usage for a listed session.
+- `n ai-use` makes a listed remote session active so subsequent `ai:` prompts continue that conversation.
+- `n ai-transcript` shows only user and assistant text for a listed session.
+- `n ai-items` prints all saved API items for a listed session, including tool call and result records.
+- `ai-new` clears only the active selection. The next `ai:` request creates a new Agents API session with no hosted sandbox; old sessions remain in the remote list and local index.
+- `ai-containers` inspects hosted environments linked to sessions in the latest `ai-sessions` snapshot. It shows environment IDs, session IDs, size, and reported status. This is not a billing meter.
+- `n ai-container` shows details for an environment from the latest `ai-containers` list.
+- `n ai-cleanup` asks for the exact confirmation `delete`, then removes that remote session and conversation. If it has an old hosted sandbox, deletion requests sandbox cleanup; physical cleanup may continue asynchronously. This cannot be undone. It removes the deleted session from the local index and requires refreshing lists before another numbered operation.
 - `ai-cancel` sends the Agents API cancellation event for an active turn. At the local approval prompt, `cancel` or `ai-cancel` also closes the paused VM task.
 
-The session ID is stored in `py/.ai_session.json`, excluded from Git. It preserves the hosted conversation across REPL restarts, but does not restore the local VM's stack, dictionary, or files.
+The active session and a local index of known session IDs are stored in `py/.ai_session.json`, excluded from Git. The remote API remains the source of session details and conversation items. Sessions do not restore the local VM's stack, dictionary, or files. Run `ai-sessions` before numbered session words and `ai-containers` before `n ai-container`.
 
 ## Local Forth tools and confirmation
 
-The agent can search the active VM's Forth dictionary. To run a program, it must request `projectk_run_forth`. The REPL refreshes the session's pending actions before displaying the proposal, then checks again before execution. It displays the complete Forth source and its stated purpose. Enter `yes` to execute it, `no` to decline, or `cancel` to cancel the local suspended task. Any other entered Forth lines at this confirmation prompt are queued and run in order after the AI task finishes. If an API result submission fails after local execution, the error reports that the Forth program already ran; inspect the VM before retrying.
+The agent can search the active VM's Forth dictionary. To run a program, it must request `projectk_run_forth`. The REPL refreshes the session's pending actions before displaying the proposal, then checks again before execution. It displays the complete Forth source and its stated purpose. At each approval prompt, `trust` executes the proposal and automatically approves later AI programs for the lifetime of the current Forth process; `yes` executes only this proposal; `no` declines this proposal; and `cancel` cancels this AI task. Run `ai-confirm` to restore per-proposal approval. Trust is held only in memory and resets when the Forth process exits. If an API result submission fails after local execution, the error reports that the Forth program already ran; inspect the VM before retrying.
 
 Network requests currently run synchronously in the REPL. While the agent is waiting for an API response, the REPL cannot yet accept and queue new input; queueing is available while the local execution confirmation is open.
 
@@ -38,11 +46,14 @@ Approved source runs in the current local VM and can use Project K's Python host
 
 - **Missing API key:** Add `OPENAI_API_KEY` to `py/.env` or the process environment, then restart the REPL.
 - **Invalid key, model, or API access:** Read the Agents API error printed by the REPL; check the Platform project, model access, and API billing/limits.
-- **Plugin/skill not found:** Ensure `PROJECTK_AI_SKILLS_DIR` points to a directory containing `projectk-forth/SKILL.md` and that `plugins/projectk-forth/.codex-plugin/plugin.json` is valid JSON.
-- **Skill changes do not take effect:** Use `ai-new` and make another request to create a session with a fresh plugin ZIP.
-- **Wrong saved conversation:** Use `ai-new` to clear the local session ID. This does not erase the remote session.
+- **Skill not found:** Ensure `PROJECTK_AI_SKILLS_DIR` points to a directory containing `projectk-forth/SKILL.md`.
+- **Skill changes do not take effect:** Use `ai-new` and make another request to create a session with fresh instructions.
+- **Wrong saved conversation:** Run `ai-sessions`, then select the intended entry with `n ai-use`.
+- **Remove a session and request hosted sandbox cleanup:** Run `ai-sessions`, then `n ai-cleanup` and type `delete` only if you intend to permanently remove that session and its conversation.
 - **Network interrupted:** The bridge reports a connection or stream error. Retry the prompt; if the turn's state is unclear, use `ai-status` and `ai-new` to deliberately start a fresh conversation.
 
 ## API flow
 
-The bridge creates an Agents API session with an OpenAI-hosted environment and an inline ZIP plugin. It streams session events, answers dictionary function calls locally, and returns function results with their `turn_id` and `call_id`. The session ID alone is persisted locally. No OpenAI SDK is required.
+The bridge creates an Agents API session with no execution environment. It includes the Project K skill and reference in the agent instructions. Because `environment.type: "none"` requires initial input, it submits and streams the first prompt during session creation. Later turns subscribe to the session stream before sending input. The bridge answers dictionary and Forth function calls locally, and returns function results with their `turn_id` and `call_id`. The active session and known IDs are persisted locally. No OpenAI SDK is required. Model token usage is still billed at the selected model's API rates; no OpenAI-hosted sandbox/container is provisioned for new sessions.
+
+`ai-containers` derives the environment list from remote sessions and retrieves each linked hosted environment by ID. The separate environments-list endpoint may require prewarming beta access, so this word does not rely on it and may not show environments no longer linked to a listed session. Environment status does not establish billable usage; use the API usage dashboard for charges.

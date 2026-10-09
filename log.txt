@@ -270,3 +270,128 @@
     --
     13:12 2026-10-06
     試試看倒推 projectK.js
+
+[ ] 09:19 2026/10/09 project K, AI container 隨時都在吃錢！
+	(misc) hcchen@Desktop-Jianfu:~$ f
+	Project K Forth REPL
+	Type 'words' to list words, 'ai: <prompt>' to ask AI, or 'bye'/Ctrl-D to exit.
+
+	> words
+	code end-code \ ( immediate // /// (last) dup drop dropall swap over rot depth >r r> r@ rdrop * + - / = <> < > <= >= 1+ 1- nip 0= not . .s cr space : ; , ! @ create (does>) does> char constant variable value to branch 0branch doNext here (s) string-quote s" s' s` s| s^ s/ BL word ' ['] [compile] begin until again if ahead then else while repeat aft for next last <py> </py> </pyV> CR py: py> py:: py>> (::) (:>) :: :> see pause *debug* words help bye cls (ai-line) (ai) ai-new ai-sessions ai-session ai-use ai-transcript ai-items ai-containers ai-container ai-cleanup ai-status ai-cancel ai:
+	 ok
+	> ai-sessions
+	Remote sessions: 1 (newest first)
+	  1. sess_0d24070289a3f9d1006ac7b88040448194834849253847c85d  2026-10-08 23:36:32 CST  idle  gpt-6-astra  env=openai_hosted *
+	 ok
+	> ai-containers
+	Hosted environments linked to sessions: 1
+	  1. env=ccarenv_b64_Y2NhcmVudl82YWM3Yjg4MDQzNjA4MTkxYjEwY2IxOWY5OGI5YTg2Mg  status=disconnected  size=medium  session=sess_0d24070289a3f9d1006ac7b88040448194834849253847c85d
+	 ok
+	> 1 ai-container
+	Environment 1: ccarenv_b64_Y2NhcmVudl82YWM3Yjg4MDQzNjA4MTkxYjEwY2IxOWY5OGI5YTg2Mg
+	Session: sess_0d24070289a3f9d1006ac7b88040448194834849253847c85d
+	Status: disconnected
+	{
+	  "type": "openai_hosted",
+	  "id": "ccarenv_b64_Y2NhcmVudl82YWM3Yjg4MDQzNjA4MTkxYjEwY2IxOWY5OGI5YTg2Mg",
+	  "object": "agent.environment",
+	  "status": "disconnected",
+	  "files": [],
+	  "skills": [],
+	  "plugins": [
+		{
+		  "type": "inline",
+		  "name": "projectk-forth",
+		  "description": "Project K Forth language guidance for the Python CLI agent."
+		}
+	  ]
+	}
+	 ok
+	> 1 ai-cleanup
+	This permanently deletes session 1: sess_0d24070289a3f9d1006ac7b88040448194834849253847c85d and its conversation.
+	If it has a hosted sandbox, deletion also requests sandbox cleanup.
+	Type 'delete' to confirm, or 'cancel' to keep the session.
+	Delete session 1 (sess_0d24070289a3f9d1006ac7b88040448194834849253847c85d)? Type delete or cancel: delete
+	AI session deleted from the API; physical cleanup may continue asynchronously.
+	 ok
+	> ai-containers
+	Error: ai-containers: Run ai-sessions first to refresh the remote list and its sequence numbers.
+	> ai-sessions
+	No remote sessions found.
+	 ok
+	> ai: tell me a joke  <--------- 故意製造活動產生一個新的 session
+	Why did the Forth programmer bring a ladder to work?
+	Because they heard the stack was getting deep.
+	 ok
+	> ai-sessions
+	Remote sessions: 1 (newest first)
+	  1. sess_0622767e7305d828006ac83e406ba88193836e4ea1a9019abf  2026-10-09 09:07:13 CST  idle  gpt-6-luna  env=none *
+	 ok
+	> ai-containers
+	No hosted environments are linked to the listed sessions. <----- 我們已經不用 container 了，所以新的活動也沒有產生 container。
+	 ok
+	> ai-sessions
+	Remote sessions: 1 (newest first)
+	  1. sess_0622767e7305d828006ac83e406ba88193836e4ea1a9019abf  2026-10-09 09:07:13 CST  idle  gpt-6-luna  env=none *
+	 ok
+	> 1 ai-transcript
+	[user]
+	tell me a joke
+
+	[assistant]
+	Why did the Forth programmer bring a ladder to work?
+	Because they heard the stack was getting deep.
+
+	 ok
+	> 1 ai-items  <-------- [ ] 這個跟前一個命令應該可以合併，應該叫做 AI Context，然後加個 switch，比如說 --json (類似 Hermes Agent 的看板命令)
+	{
+	  "type": "message",
+	  "id": "msg_bac516456d2cfb33e34b13b7517f8fc73b271cf6ff041efa83",
+	  "turn_id": "turn_0622767e7305d828006ac83e459af081939b258b28328ed2c6",
+	  "role": "user",
+	  "content": [
+		{
+		  "type": "input_text",
+		  "text": "tell me a joke"
+		}
+	  ],
+	  "status": "completed",
+	  "phase": null
+	}
+	{
+	  "type": "message",
+	  "id": "msg_0bd7bb5f8a585084016ac83e4556fc87d1b9e330a340f51484",
+	  "turn_id": "turn_0622767e7305d828006ac83e459af081939b258b28328ed2c6",
+	  "role": "assistant",
+	  "content": [
+		{
+		  "type": "output_text",
+		  "text": "Why did the Forth programmer bring a ladder to work?  \nBecause they heard the stack was getting deep."
+		}
+	  ],
+	  "status": "completed",
+	  "phase": "final_answer"
+	}
+	 ok
+	> ai-status <-- [ ] 應該要順便看這個 session 有沒有 container 
+	Active AI session: sess_0622767e7305d828006ac83e406ba88193836e4ea1a9019abf
+	Locally indexed sessions: 1
+	 ok
+	> 1 ai-container
+	Error: ai-container: Container number must be between 1 and 0.
+	>	
+
+[ ] 09:28 2026/10/09 確認 Project K Agents API 沒有再繼續 container 扣錢
+	https://platform.openai.com/settings/organization/usage
+
+[ ]
+[ ]
+[ ]
+[ ]
+[X]
+
+🦞（龍蝦） 📖 NotebookLM ⚛️ OpenAI ✨ Gemini
+🌞 🌈 💡 Bulb ❌ Canceled 🎉 Party 🤗 Hugging Face ⚠️ Warning ✅ Checked 🌟 Stars
+🦀（螃蟹）💫 🪐 🌠
+
+	

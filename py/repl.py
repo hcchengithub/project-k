@@ -124,7 +124,7 @@ def _process_one_line(vm: VM, line: str, state: dict) -> None:
 
     task = vm.dictate(line)
     if task.status == "paused":
-        if vm.host.get("ai_pending_approval"):
+        if vm.host.get("ai_pending_approval") or vm.host.get("ai_cleanup_pending"):
             state["ai_task"] = task
         else:
             print("Task: paused")
@@ -145,13 +145,21 @@ def repl(vm: VM | None = None) -> None:
     while True:
         try:
             pending = vm.host.get("ai_pending_approval")
+            cleanup = vm.host.get("ai_cleanup_pending")
             if pending:
                 call_id = pending["action"].get("call_id")
                 if state["displayed_approval"] != call_id:
                     print("\nAI proposes this Forth program:")
                     print(f"Purpose: {pending['purpose']}\n---\n{pending['source']}\n---")
                     state["displayed_approval"] = call_id
-                prompt = "Run it? Type yes, no, or cancel (other Forth lines will queue): "
+                print("Trust: run this and automatically approve future AI programs for this Forth run.")
+                print("Yes: run this program once.")
+                print("No: decline this program.")
+                print("Cancel: cancel this AI mission.")
+                prompt = "Run it? Type trust, yes, no, or cancel: "
+            elif cleanup:
+                prompt = (f"Delete session {cleanup['index']} ({cleanup['session_id']})? "
+                          "Type delete or cancel: ")
             elif state["queued"]:
                 raw_input = state["queued"].popleft()
                 _process_one_line(vm, raw_input, state)
@@ -168,10 +176,32 @@ def repl(vm: VM | None = None) -> None:
             lines = clean_input.split("\n")
             for line in lines:
                 pending = vm.host.get("ai_pending_approval")
+                cleanup = vm.host.get("ai_cleanup_pending")
+                if cleanup and not pending:
+                    choice = line.strip().casefold()
+                    if choice == "delete":
+                        vm.host["ai_cleanup_result"] = True
+                    elif choice == "cancel":
+                        vm.host["ai_cleanup_result"] = False
+                    else:
+                        if line.strip():
+                            state["queued"].append(line)
+                        continue
+                    vm.host.pop("ai_cleanup_pending", None)
+                    task = state.get("ai_task")
+                    state["ai_task"] = None
+                    if task:
+                        task.resume()
+                        if task.status == "paused" and (vm.host.get("ai_pending_approval") or vm.host.get("ai_cleanup_pending")):
+                            state["ai_task"] = task
+                        elif task.status == "done":
+                            print(" ok")
+                    vm.host.pop("ai_cleanup_result", None)
+                    continue
                 if pending:
                     choice = line.strip().casefold()
-                    if choice in {"yes", "y"}:
-                        vm.host["ai_approval_result"] = True
+                    if choice in {"trust", "yes", "y"}:
+                        vm.host["ai_approval_result"] = "trust" if choice == "trust" else True
                     elif choice in {"no", "n"}:
                         vm.host["ai_approval_result"] = False
                     elif choice in {"cancel", "ai-cancel"}:
@@ -221,12 +251,15 @@ def repl(vm: VM | None = None) -> None:
                     ai_bridge.cancel_turn()
                 except Exception as err:
                     print(f"Could not cancel remote turn: {err}")
+            if vm.host.get("ai_pending_approval") or vm.host.get("ai_cleanup_pending"):
                 task = state.get("ai_task")
                 if task:
                     task.cancel()
                 state["ai_task"] = None
                 vm.host.pop("ai_pending_approval", None)
                 vm.host.pop("ai_approval_result", None)
+                vm.host.pop("ai_cleanup_pending", None)
+                vm.host.pop("ai_cleanup_result", None)
                 state["displayed_approval"] = None
             state["in_code_block"] = False
             state["code_buffer"] = []

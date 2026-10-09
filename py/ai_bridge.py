@@ -1,15 +1,15 @@
 """Standard-library bridge to the OpenAI Agents API."""
 from __future__ import annotations
 
-import base64
+from datetime import datetime, timezone
 import io
 import json
 import os
 import re
 from contextlib import redirect_stderr, redirect_stdout
 import urllib.error
+import urllib.parse
 import urllib.request
-import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -58,74 +58,173 @@ def _request(method, path, payload=None, stream=False):
 
 
 def _saved_session():
+    return _session_store().get("active_session_id") or ""
+
+
+def _session_store():
     try:
         value = json.loads(SESSION_FILE.read_text(encoding="utf-8"))
-        return value.get("session_id", "") if isinstance(value, dict) else ""
+        if not isinstance(value, dict):
+            return {"active_session_id": "", "sessions": []}
+        if isinstance(value.get("sessions"), list):
+            return {"active_session_id": value.get("active_session_id") or "",
+                    "sessions": value["sessions"]}
+        # Migrate the original one-session file without losing its saved ID.
+        session_id = value.get("session_id", "")
+        return {"active_session_id": session_id,
+                "sessions": ([{"id": session_id}] if session_id else [])}
     except (OSError, ValueError):
-        return ""
+        return {"active_session_id": "", "sessions": []}
 
 
-def _save_session(session_id):
+def _write_session_store(store):
     temporary = SESSION_FILE.with_suffix(".tmp")
-    temporary.write_text(json.dumps({"session_id": session_id}, indent=2), encoding="utf-8")
+    temporary.write_text(json.dumps(store, indent=2, ensure_ascii=False), encoding="utf-8")
     os.replace(temporary, SESSION_FILE)
 
 
-def _create_session():
+def _save_session(session_id, metadata=None):
+    store = _session_store()
+    entries = store["sessions"]
+    record = next((item for item in entries if item.get("id") == session_id), None)
+    if record is None:
+        record = {"id": session_id}
+        entries.insert(0, record)
+    if metadata:
+        record.update({key: value for key, value in metadata.items() if value is not None})
+    store["active_session_id"] = session_id
+    _write_session_store(store)
+
+
+def _remember_remote_sessions(sessions):
+    store = _session_store()
+    by_id = {item.get("id"): item for item in store["sessions"] if item.get("id")}
+    merged = []
+    for session in sessions:
+        session_id = session.get("id")
+        if not session_id:
+            continue
+        record = by_id.get(session_id, {"id": session_id})
+        record.update({key: session.get(key) for key in ("created_at", "last_active_at")
+                       if session.get(key) is not None})
+        merged.append(record)
+    merged_ids = {item.get("id") for item in merged}
+    for record in store["sessions"]:
+        if record.get("id") not in merged_ids:
+            merged.append(record)
+    store["sessions"] = merged
+    _write_session_store(store)
+
+
+def _forget_session(session_id):
+    store = _session_store()
+    store["sessions"] = [item for item in store["sessions"] if item.get("id") != session_id]
+    if store.get("active_session_id") == session_id:
+        store["active_session_id"] = ""
+    _write_session_store(store)
+
+
+def _api_get(path):
+    with _request("GET", path) as response:
+        return json.load(response)
+
+
+def _list_remote_sessions():
+    sessions = []
+    after = ""
+    while True:
+        query = urllib.parse.urlencode({"limit": 100, "order": "desc", **({"after": after} if after else {})})
+        page = _api_get(f"/sessions?{query}")
+        sessions.extend(page.get("data") or [])
+        if not page.get("has_more") or not page.get("last_id") or page["last_id"] == after:
+            return sessions
+        after = page["last_id"]
+
+
+def _list_session_items(session_id):
+    items = []
+    after = ""
+    while True:
+        query = urllib.parse.urlencode({"limit": 100, "order": "asc", **({"after": after} if after else {})})
+        page = _api_get(f"/sessions/{urllib.parse.quote(session_id, safe='')}/items?{query}")
+        items.extend(page.get("data") or [])
+        if not page.get("has_more") or not page.get("last_id") or page["last_id"] == after:
+            return items
+        after = page["last_id"]
+
+
+def _session_snapshot(vm, key="ai_session_rows"):
+    rows = vm.host.get(key)
+    if rows is None:
+        raise RuntimeError("Run ai-sessions first to refresh the remote list and its sequence numbers.")
+    return rows
+
+
+def _selected_row(vm, index, key="ai_session_rows"):
+    if not isinstance(index, int) or isinstance(index, bool) or index < 1:
+        raise RuntimeError("Session number must be a positive integer.")
+    rows = _session_snapshot(vm, key)
+    if index > len(rows):
+        raise RuntimeError(f"No item {index}; the current list has {len(rows)} entries.")
+    return rows[index - 1]
+
+
+def _format_time(value):
+    if not value:
+        return "unknown"
+    try:
+        return datetime.fromtimestamp(int(value), timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
+    except (ValueError, TypeError, OSError, OverflowError):
+        return str(value)
+
+
+def _delete_session(session_id):
+    with _request("DELETE", f"/sessions/{urllib.parse.quote(session_id, safe='')}") as response:
+        return json.load(response)
+
+
+def _create_session(prompt):
     skills_root = Path(os.environ.get("PROJECTK_AI_SKILLS_DIR", str(ROOT / "skills"))).expanduser()
     if not skills_root.is_absolute():
         skills_root = (ROOT / skills_root).resolve()
     skill = skills_root / "projectk-forth"
     if not (skill / "SKILL.md").is_file():
         raise RuntimeError(f"Project K Forth skill not found: {skill / 'SKILL.md'}")
-    plugin = ROOT / "plugins" / "projectk-forth"
-    manifest_path = plugin / ".codex-plugin" / "plugin.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    bundle = io.BytesIO()
-    with zipfile.ZipFile(bundle, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.write(manifest_path, "projectk-forth/.codex-plugin/plugin.json")
-        for path in sorted(skill.rglob("*")):
-            if path.is_symlink():
-                raise RuntimeError(f"Skill plugin cannot package symlink: {path}")
-            if path.is_file():
-                archive.write(path, "projectk-forth/skills/projectk-forth/" + path.relative_to(skill).as_posix())
-    zipped = bundle.getvalue()
-    if len(zipped) > 2 * 1024 * 1024:
-        raise RuntimeError("Skill plugin ZIP exceeds 2 MiB.")
+    skill_text = (skill / "SKILL.md").read_text(encoding="utf-8")
+    reference_path = skill / "references" / "forth-reference.md"
+    reference_text = reference_path.read_text(encoding="utf-8") if reference_path.is_file() else ""
+    # With environment=none there is no filesystem in which to load a plugin;
+    # include the Project K guidance directly in the agent instructions.
+    skill_text = re.sub(r"\A---\s*\n.*?\n---\s*\n", "", skill_text, count=1, flags=re.S)
+    instructions = (
+        "You assist with Project K Forth. Use the live dictionary tool before relying on unfamiliar words. "
+        "Only the local Forth tool can execute code. The local CLI controls approval: each proposal requires user approval unless the user chooses Trust, which approves future proposals for this REPL process only. The user can restore per-proposal approval with ai-confirm. Never infer Trust from a prior Yes.\n\n"
+        + skill_text + ("\n\nForth reference:\n" + reference_text if reference_text else "")
+    )
+    if len(instructions.encode("utf-8")) > 100_000:
+        raise RuntimeError("Project K Forth skill text is too large to include in agent instructions.")
     tools = [
         {"type": "function", "name": "projectk_search_words",
          "description": "Search the current Forth dictionary and documentation.",
          "parameters": {"type": "object", "properties": {"query": {"type": "string"}},
                         "required": ["query"], "additionalProperties": False}},
         {"type": "function", "name": "projectk_run_forth",
-         "description": "Propose Forth source for execution in the user's current local VM. The CLI asks for approval first.",
+         "description": "Propose Forth source for execution in the user's current local VM. The CLI applies its current approval mode.",
          "parameters": {"type": "object", "properties": {"source": {"type": "string"}, "purpose": {"type": "string"}},
                         "required": ["source", "purpose"], "additionalProperties": False}},
     ]
     payload = {
         "agent": {"model": os.environ.get("PROJECTK_AI_MODEL", "gpt-6-astra"), "tools": tools,
-                  "instructions": "You assist with Project K Forth. Follow the Project K Forth skill. "
-                  "Use the live dictionary tool before relying on unfamiliar words. Only the local Forth "
-                  "tool can execute code, and it always requires explicit user approval."},
-        "environment": {"type": "openai_hosted", "plugins": [{"type": "inline",
-            "name": manifest["name"], "description": manifest["description"],
-            "source": {"type": "base64", "media_type": "application/zip",
-                       "data": base64.b64encode(zipped).decode("ascii")}}]},
+                  "instructions": instructions},
+        "environment": {"type": "none"},
+        "input": prompt,
+        "stream": True,
     }
-    with _request("POST", "/sessions", payload) as response:
-        result = json.load(response)
-    if not result.get("id"):
-        raise RuntimeError("Agents API response did not include a session ID.")
-    _save_session(result["id"])
-    return result["id"]
+    return _event_stream(_request("POST", "/sessions", payload, stream=True))
 
 
-def _stream(session_id, event):
-    response = _request("GET", f"/sessions/{session_id}/events?stream=true", stream=True)
+def _event_stream(response):
     try:
-        # Subscribe before creating the turn so the first event cannot be missed.
-        with _request("POST", f"/sessions/{session_id}/events", {"events": [event]}) as accepted:
-            accepted.read()
         data = []
         for raw in response:
             line = raw.decode("utf-8", "replace").rstrip("\r\n")
@@ -145,25 +244,38 @@ def _stream(session_id, event):
         response.close()
 
 
+def _stream(session_id, event):
+    encoded_id = urllib.parse.quote(session_id, safe="")
+    response = _request("GET", f"/sessions/{encoded_id}/events?stream=true", stream=True)
+    try:
+        # Subscribe before creating the turn so the first event cannot be missed.
+        with _request("POST", f"/sessions/{encoded_id}/events", {"events": [event]}) as accepted:
+            accepted.read()
+        yield from _event_stream(response)
+    finally:
+        if not response.closed:
+            response.close()
+
+
 def _tool_result(session_id, action, success, output="", error=""):
     event = {"type": "agent.session.input.tool_result", "turn_id": action["turn_id"],
              "call_id": action["call_id"], "success": success}
     event["output" if success else "error"] = output if success else error
-    with _request("POST", f"/sessions/{session_id}/events", {"events": [event]}) as response:
+    encoded_id = urllib.parse.quote(session_id, safe="")
+    with _request("POST", f"/sessions/{encoded_id}/events", {"events": [event]}) as response:
         response.read()
 
 
 def _current_actions(session_id):
     """Fetch current pending calls; event payloads are only notifications."""
-    with _request("GET", f"/sessions/{session_id}") as response:
-        session = json.load(response)
+    session = _api_get(f"/sessions/{urllib.parse.quote(session_id, safe='')}")
     return session.get("status"), session.get("required_actions") or []
 
 
 def cancel_turn():
     session_id = _saved_session()
     if session_id:
-        with _request("POST", f"/sessions/{session_id}/events", {
+        with _request("POST", f"/sessions/{urllib.parse.quote(session_id, safe='')}/events", {
                 "events": [{"type": "agent.session.input.cancel"}]}) as response:
             response.read()
 
@@ -199,14 +311,28 @@ def _run(vm, source):
     return json.dumps(result, ensure_ascii=False)
 
 
+def _session_id_from_event(event):
+    session = event.get("session") or event.get("data") or {}
+    if isinstance(session, dict):
+        return session.get("id") or session.get("session_id") or event.get("session_id")
+    return event.get("session_id")
+
+
 def ask(vm, prompt):
     """Yield text and approval events; resumes after REPL writes ai_approval_result."""
     if not prompt.strip():
         raise RuntimeError("ai: needs a prompt on the same line.")
-    session_id = _saved_session() or _create_session()
+    session_id = _saved_session()
     message = {"type": "agent.session.input.message", "input": [{"role": "user", "content": [
         {"type": "input_text", "text": prompt}]}]}
-    for event in _stream(session_id, message):
+    events = _stream(session_id, message) if session_id else _create_session(prompt)
+    for event in events:
+        if not session_id:
+            session_id = _session_id_from_event(event)
+            if session_id:
+                created = event.get("session") or event.get("data") or {}
+                _save_session(session_id, {key: created.get(key)
+                                           for key in ("created_at", "last_active_at")})
         kind = event.get("type", "")
         if kind == "agent.session.turn.output_text.delta":
             yield {"kind": "text", "text": event.get("delta", "")}
@@ -226,10 +352,20 @@ def ask(vm, prompt):
                 if name == "projectk_search_words":
                     _tool_result(session_id, action, True, _search(vm, str(arguments.get("query", ""))))
                 elif name == "projectk_run_forth":
-                    yield {"kind": "approval", "action": action,
-                           "source": str(arguments.get("source", "")),
-                           "purpose": str(arguments.get("purpose", ""))}
-                    approved = bool(vm.host.pop("ai_approval_result", False))
+                    proposal = {"kind": "approval", "action": action,
+                                "source": str(arguments.get("source", "")),
+                                "purpose": str(arguments.get("purpose", ""))}
+                    if vm.host.get("ai_trusted", False):
+                        yield {**proposal, "trusted": True}
+                        approved = True
+                    else:
+                        yield proposal
+                        approval = vm.host.pop("ai_approval_result", False)
+                        if isinstance(approval, str) and approval.casefold() == "trust":
+                            vm.host["ai_trusted"] = True
+                            approved = True
+                        else:
+                            approved = bool(approval)
                     if approved:
                         status, still_pending = _current_actions(session_id)
                         if status != "requires_action" or not any(
@@ -257,23 +393,42 @@ def ask(vm, prompt):
             raise RuntimeError(f"Agents API {kind}: {detail}")
         elif kind == "agent.session.turn.completed":
             return
+    if not session_id:
+        raise RuntimeError("Agents API stream ended without returning the new session ID.")
 
 
 def install(vm):
     def run_prompt(current_vm, prompt, push_response=False):
         answer = []
+        ai_started = False
+        ai_line_start = True
         for event in ask(current_vm, prompt):
             if event["kind"] == "text":
                 if push_response:
                     answer.append(event["text"])
                 else:
-                    print(event["text"], end="", flush=True)
+                    text = event["text"]
+                    if text and not ai_started:
+                        print()
+                        ai_started = True
+                    for part in text.splitlines(keepends=True):
+                        if ai_line_start:
+                            print("🤖 ", end="")
+                        print(part, end="", flush=True)
+                        ai_line_start = part.endswith("\n") or part.endswith("\r")
             elif event["kind"] == "text_done":
                 if push_response:
                     answer[:] = [event["text"]]
                 else:
-                    print()
+                    if ai_started and not ai_line_start:
+                        print()
+                    ai_started = False
+                    ai_line_start = True
             elif event["kind"] == "approval":
+                if event.get("trusted"):
+                    print("\n🤖 AI proposes this Forth program (auto-approved for this Forth run):")
+                    print(f"Purpose: {event['purpose']}\n---\n{event['source']}\n---")
+                    continue
                 current_vm.host["ai_pending_approval"] = event
                 yield current_vm.pause()
         if push_response:
@@ -306,14 +461,148 @@ def install(vm):
             raise
 
     def new_session(current_vm):
-        try:
-            SESSION_FILE.unlink(missing_ok=True)
-        except OSError as exc:
-            raise RuntimeError(f"Could not clear local session: {exc}") from None
-        print("Local AI session cleared; the next request creates a new session.")
+        store = _session_store()
+        store["active_session_id"] = ""
+        _write_session_store(store)
+        print("A fresh conversation will be created on your next ai: request; session history is kept.")
+
+    def sessions(current_vm):
+        rows = _list_remote_sessions()
+        _remember_remote_sessions(rows)
+        current_vm.host["ai_session_rows"] = rows
+        if not rows:
+            print("No remote sessions found.")
+            return
+        active_id = _saved_session()
+        print(f"Remote sessions: {len(rows)} (newest first)")
+        for index, row in enumerate(rows, 1):
+            env = row.get("environment") or {}
+            marker = " *" if row.get("id") == active_id else ""
+            print(f"{index:>3}. {row.get('id')}  {_format_time(row.get('created_at'))}  "
+                  f"{row.get('status', 'unknown')}  {(row.get('agent') or {}).get('model', 'unknown')}  "
+                  f"env={env.get('type', 'unknown')}{marker}")
+
+    def selected_session(current_vm):
+        index = current_vm.pop()
+        row = _selected_row(current_vm, index)
+        return index, row
+
+    def session_details(current_vm):
+        index, row = selected_session(current_vm)
+        detail = _api_get(f"/sessions/{urllib.parse.quote(row['id'], safe='')}")
+        agent = detail.get("agent") or {}
+        env = detail.get("environment") or {}
+        usage = detail.get("usage") or {}
+        print(f"Session {index}: {detail.get('id')}")
+        print(f"Created: {_format_time(detail.get('created_at'))}")
+        print(f"Last active: {_format_time(detail.get('last_active_at'))}")
+        print(f"Status: {detail.get('status', 'unknown')}")
+        print(f"Model: {agent.get('model', 'unknown')}")
+        print(f"Environment: {env.get('type', 'unknown')} (id={env.get('id', 'none')}, "
+              f"size={env.get('container_size', 'n/a')})")
+        print(f"Usage: input={usage.get('input_tokens', 0)} output={usage.get('output_tokens', 0)} "
+              f"total={usage.get('total_tokens', 0)} tokens")
+        if detail.get("error"):
+            print(f"Error: {detail['error']}")
+
+    def use_session(current_vm):
+        index, row = selected_session(current_vm)
+        detail = _api_get(f"/sessions/{urllib.parse.quote(row['id'], safe='')}")
+        _save_session(row["id"], {"created_at": detail.get("created_at")})
+        print(f"Using session {index}: {row['id']}")
+
+    def show_transcript(current_vm, include_items=False):
+        index, row = selected_session(current_vm)
+        items = _list_session_items(row["id"])
+        if include_items:
+            for item in items:
+                print(json.dumps(item, ensure_ascii=False, indent=2))
+            if not items:
+                print("No saved items.")
+            return
+        shown = 0
+        for item in items:
+            if item.get("type") != "message" or item.get("role") not in {"user", "assistant"}:
+                continue
+            parts = []
+            for part in item.get("content") or []:
+                if isinstance(part, dict) and isinstance(part.get("text"), str):
+                    parts.append(part["text"])
+                elif isinstance(part, str):
+                    parts.append(part)
+            text = "".join(parts).strip()
+            if text:
+                print(f"[{item['role']}]\n{text}\n")
+                shown += 1
+        if not shown:
+            print(f"Session {index} has no user/assistant text items.")
+
+    def containers(current_vm):
+        session_rows = _session_snapshot(current_vm)
+        rows = []
+        for session in session_rows:
+            detail = _api_get(f"/sessions/{urllib.parse.quote(session['id'], safe='')}")
+            env = detail.get("environment") or {}
+            if env.get("type") != "openai_hosted" or not env.get("id"):
+                continue
+            try:
+                env_detail = _api_get(f"/environments/{urllib.parse.quote(env['id'], safe='')}")
+                status = env_detail.get("status", "unknown")
+            except RuntimeError as exc:
+                env_detail = {}
+                status = f"unavailable ({exc})"
+            rows.append({"session_id": session["id"], "environment_id": env["id"],
+                         "container_size": env.get("container_size"), "status": status,
+                         "details": env_detail})
+        current_vm.host["ai_container_rows"] = rows
+        if not rows:
+            print("No hosted environments are linked to the listed sessions.")
+            return
+        print(f"Hosted environments linked to sessions: {len(rows)}")
+        for index, row in enumerate(rows, 1):
+            print(f"{index:>3}. env={row['environment_id']}  status={row['status']}  "
+                  f"size={row.get('container_size') or 'unknown'}  session={row['session_id']}")
+
+    def container_details(current_vm):
+        index = current_vm.pop()
+        rows = _session_snapshot(current_vm, "ai_container_rows")
+        if not isinstance(index, int) or isinstance(index, bool) or index < 1 or index > len(rows):
+            raise RuntimeError(f"Container number must be between 1 and {len(rows)}.")
+        row = rows[index - 1]
+        print(f"Environment {index}: {row['environment_id']}")
+        print(f"Session: {row['session_id']}")
+        print(f"Status: {row['status']}")
+        print(json.dumps(row.get("details") or {}, ensure_ascii=False, indent=2))
+
+    def cleanup_session(current_vm):
+        index, row = selected_session(current_vm)
+        session_id = row["id"]
+        print(f"This permanently deletes session {index}: {session_id} and its conversation.")
+        print("If it has a hosted sandbox, deletion also requests sandbox cleanup.")
+        print("Type 'delete' to confirm, or 'cancel' to keep the session.")
+        current_vm.host["ai_cleanup_pending"] = {"index": index, "session_id": session_id}
+        yield current_vm.pause()
+        approved = bool(current_vm.host.pop("ai_cleanup_result", False))
+        current_vm.host.pop("ai_cleanup_pending", None)
+        if not approved:
+            print("AI session kept.")
+            return
+        result = _delete_session(session_id)
+        if result.get("deleted") is not True:
+            raise RuntimeError("Agents API did not confirm session deletion.")
+        _forget_session(session_id)
+        current_vm.host.pop("ai_session_rows", None)
+        current_vm.host.pop("ai_container_rows", None)
+        print("AI session deleted from the API; physical cleanup may continue asynchronously.")
 
     def status(current_vm):
-        print("AI session: " + (_saved_session() or "not created"))
+        store = _session_store()
+        print("Active AI session: " + (_saved_session() or "none (next request starts a new session)"))
+        print(f"Locally indexed sessions: {len(store['sessions'])}")
+
+    def confirm_ai(current_vm):
+        current_vm.host.pop("ai_trusted", None)
+        print("AI Forth programs will require approval again.")
 
     def cancel_word(current_vm):
         if current_vm.host.get("ai_pending_approval"):
@@ -324,6 +613,17 @@ def install(vm):
 
     vm.define("(ai-line)", ai_line, help="Host implementation used by ai.f.")
     vm.define("(ai)", ai_stack, help="( prompt-string -- response-string ) Ask AI.")
-    vm.define("ai-new", new_session, help="Clear the saved session ID.")
-    vm.define("ai-status", status, help="Show the saved session ID, if any.")
+    vm.define("ai-new", new_session, help="Start a fresh conversation on the next AI request; keep history.")
+    vm.define("ai-sessions", sessions, help="List remote sessions; sequence numbers are newest first.")
+    vm.define("ai-session", session_details, help="( session-number -- ) Show remote session details.")
+    vm.define("ai-use", use_session, help="( session-number -- ) Select a remote session for follow-up chat.")
+    vm.define("ai-transcript", lambda current_vm: show_transcript(current_vm),
+              help="( session-number -- ) Show user and assistant text.")
+    vm.define("ai-items", lambda current_vm: show_transcript(current_vm, True),
+              help="( session-number -- ) Show all saved session items, including tool interactions.")
+    vm.define("ai-containers", containers, help="List hosted environments linked to remote sessions.")
+    vm.define("ai-container", container_details, help="( container-number -- ) Show hosted environment details.")
+    vm.define("ai-cleanup", cleanup_session, help="( session-number -- ) Delete a remote session after confirmation.")
+    vm.define("ai-status", status, help="Show the active session and local index count.")
+    vm.define("ai-confirm", confirm_ai, help="Require approval for each AI Forth program again.")
     vm.define("ai-cancel", cancel_word, help="Cancel the active Agents API turn.")
