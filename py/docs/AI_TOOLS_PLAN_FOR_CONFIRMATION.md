@@ -4,6 +4,8 @@
 
 提供六個由 AI 查詢並使用的 Forth words：system_info、run_pwsh、run_bash、run_curl、run_http、stringify，支援 Windows PowerShell 7 與 WSL2 Ubuntu，也支援 Linux／WSL 主機。
 
+Words 的 stack 操作、輸入檢查與主機命令組裝定義在 `ai.f`。`ai_tools.py` 只保留 Python 專屬的程序啟動、主機偵測與 HTTP 傳輸 helper，由 `ai.f` 的 `code` words 匯入呼叫。
+
 ## AI 如何使用這些 words
 
 這些 words 不會各自註冊成 Agents API 的獨立 function schema。AI 透過現有的字典搜尋工具讀取 word 名稱、stack signature、help 與說明，再組成 Forth 程式，交由既有的 Forth 執行工具提出執行。該工具仍要求使用者明確核准。

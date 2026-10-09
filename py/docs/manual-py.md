@@ -134,7 +134,7 @@ flowchart TD
 | `projectk.py` | 核心 VM 引擎 | 包含 `Input` 串流解析器、`_Word` 核心結構、`Task` 狀態機、`VM` 容器，以及原生 Python 代碼塊 (`code ... end-code`) 的語彙編譯機制。不預載任何高階 Forth 詞彙，純粹、輕量且原生支援 Coroutines。 |
 | `base.f` | Bootstrap 字典 | 以 Forth 撰寫的核心字典，包含控制結構、字串家族、Defining Words、`does>`、三階段 `see` 與 Python Host Bridge。 |
 | `auxiliary.f` | 輔助字典 | Forth 優先的非核心工具 words，例如 `cls` 和 `stringify`。 |
-| `ai.f` / `ai_bridge.py` | AI 擴充 | `ai.f` 以 Forth code words 與 colon words 實作 AI 介面及主要流程；`ai_bridge.py` 保留標準函式庫 HTTP/SSE 傳輸、session index 檔案等 Python 基礎功能。 |
+| `ai.f` / `ai_bridge.py` / `ai_tools.py` | AI 擴充 | `ai.f` 以 Forth code words 與 colon words 實作 AI 介面、主要流程及本機工具 words；`ai_bridge.py` 保留 Agents API 傳輸與 session 檔案功能；`ai_tools.py` 僅提供程序執行、主機偵測及 HTTP 傳輸等 Python 專屬功能。 |
 | `repl.py` | 執行期與 REPL | 負責環境裝配、載入 `base.f`、安裝 host primitives、載入 `auxiliary.f` 與 `ai.f`，以及 REPL 輸入處理。 |
 | `f.sh` / `f.cmd` / `f.bat` | 平台啟動器 | `f.sh` 讀取 `PROJECTK_VENV` 並使用 Linux/WSL VENV；Windows launcher 呼叫 PATH 上的 `python`，須由 Windows Python 環境提供 `prompt_toolkit`。 |
 

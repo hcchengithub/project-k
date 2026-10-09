@@ -24,7 +24,6 @@ except ImportError:
 
 from projectk import VM, ForthError
 import ai_bridge
-import ai_tools
 
 
 class Constant:
@@ -93,7 +92,6 @@ def create_vm(base_file: str | None = None) -> VM:
         vm.dictate(bootstrap)
     else:
         raise ForthError(f"Bootstrap file not found: {target_base}")
-    ai_tools.install(vm)
     with open(AUXILIARY_F_PATH, "r", encoding="utf-8") as f:
         vm.dictate(f.read())
     if os.path.isfile(AI_F_PATH):

@@ -24,6 +24,134 @@ code ai-confirm
 end-code
 // ( -- ) Require approval for each AI Forth program again.
 
+code system_info
+    import ai_tools
+
+    word = vm.words["system_info"]
+    info = word.properties.get("system_info")
+    if info is None:
+        info = ai_tools._detect_system_info()
+        word.properties["system_info"] = info
+    vm.push(info)
+end-code
+// ( -- info ) Return cached host, Python venv, WSL, and shell details.
+/// The first call detects the host and caches stable details on this word object's properties for this VM lifetime.
+
+code (ai-tool-error)
+    message = vm.pop()
+    vm.push({"exit_code": None, "stdout": "", "stderr": "", "timed_out": False,
+             "truncated": False, "error": str(message)})
+end-code
+// ( message -- result ) Build a normalized local tool error result.
+
+code run_pwsh
+    import ai_tools
+
+    script = vm.pop()
+    if not isinstance(script, str):
+        vm.push("run_pwsh expects a script string.")
+        yield from vm.call(vm.tick("(ai-tool-error)"))
+        return
+    yield from vm.call(vm.tick("system_info"))
+    pwsh = vm.pop()["shells"]["pwsh"]
+    if not pwsh.get("available"):
+        vm.push("PowerShell 7 (pwsh) is not available in this environment.")
+        yield from vm.call(vm.tick("(ai-tool-error)"))
+        return
+    vm.push(ai_tools._run_process(
+        [pwsh["path"], "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "-"],
+        input_text=script))
+end-code
+// ( script-string -- result ) Run a PowerShell 7 script without profiles.
+/// Returns exit_code, stdout, stderr, timed_out, truncated, and optional error details. Runs locally with the current user's permissions.
+
+code run_bash
+    import ai_tools
+
+    script = vm.pop()
+    if not isinstance(script, str):
+        vm.push("run_bash expects a script string.")
+        yield from vm.call(vm.tick("(ai-tool-error)"))
+        return
+    yield from vm.call(vm.tick("system_info"))
+    info = vm.pop()
+    if info["os"] == "Windows":
+        wsl = info["wsl"]
+        if not wsl.get("available") or not wsl.get("path") or not wsl.get("distro"):
+            vm.push("WSL with an Ubuntu distribution is not available.")
+            yield from vm.call(vm.tick("(ai-tool-error)"))
+            return
+        argv = [wsl["path"], "-d", wsl["distro"], "--exec", "bash", "--noprofile", "--norc", "-s"]
+    else:
+        bash = info["shells"]["bash"]
+        if not bash.get("available") or not bash.get("path"):
+            vm.push("Bash is not available in this environment.")
+            yield from vm.call(vm.tick("(ai-tool-error)"))
+            return
+        argv = [bash["path"], "--noprofile", "--norc", "-s"]
+    vm.push(ai_tools._run_process(argv, input_text=script))
+end-code
+// ( script-string -- result ) Run Bash natively or through the configured Ubuntu WSL distro.
+/// Returns exit_code, stdout, stderr, timed_out, truncated, and optional error details.
+
+code run_curl
+    import ai_tools
+
+    arguments = vm.pop()
+    if not isinstance(arguments, (list, tuple)) or not all(isinstance(item, str) for item in arguments):
+        vm.push("run_curl expects a list of curl argument strings, including the URL.")
+        yield from vm.call(vm.tick("(ai-tool-error)"))
+        return
+    yield from vm.call(vm.tick("system_info"))
+    curl = vm.pop()["shells"]["curl"]
+    if not curl.get("available") or not curl.get("path"):
+        vm.push("curl is not available in this environment.")
+        yield from vm.call(vm.tick("(ai-tool-error)"))
+        return
+    vm.push(ai_tools._run_process([curl["path"], *arguments]))
+end-code
+// ( argument-list -- result ) Run curl with arguments passed directly, without shell parsing.
+/// Include the URL. Returns exit_code, stdout, stderr, timed_out, truncated, and optional error details.
+
+code run_http
+    import ai_tools
+    import urllib.parse
+
+    request = vm.pop()
+    if not isinstance(request, dict):
+        vm.push({"error": "run_http expects a request mapping with a url field."})
+        return
+    url = request.get("url")
+    if not isinstance(url, str):
+        vm.push({"error": "run_http request url must be a string."})
+        return
+    try:
+        parsed = urllib.parse.urlsplit(url)
+    except ValueError as exc:
+        vm.push({"error": str(exc)})
+        return
+    if parsed.scheme.casefold() not in ("http", "https") or not parsed.netloc:
+        vm.push({"error": "run_http only supports absolute http:// or https:// URLs."})
+        return
+    method = request.get("method", "GET")
+    headers = request.get("headers", {})
+    body = request.get("body")
+    if not isinstance(method, str) or not method:
+        vm.push({"error": "run_http method must be a nonempty string."})
+        return
+    if not isinstance(headers, dict) or not all(
+        isinstance(key, str) and isinstance(value, str) for key, value in headers.items()
+    ):
+        vm.push({"error": "run_http headers must be a mapping of strings to strings."})
+        return
+    if body is not None and not isinstance(body, str):
+        vm.push({"error": "run_http body must be a string when provided."})
+        return
+    vm.push(ai_tools._http_request(url, method.upper(), headers, body))
+end-code
+// ( request-mapping -- response ) Send one HTTP/HTTPS request.
+/// Request fields: url (required), method (default GET), headers (string mapping), and body (optional string).
+
 code (ai-request)
     import ai_bridge
     import json

@@ -399,10 +399,68 @@ class ReplBootstrapTests(unittest.TestCase):
     def test_ai_workflow_words_are_defined_in_ai_f(self):
         for name in ("ai-sessions", "ai-session", "ai-use", "ai-containers",
                      "ai-container", "ai-cleanup", "ai-cancel", "(ai-request)",
-                     "(ai-context)"):
+                     "(ai-context)", "system_info", "run_pwsh", "run_bash",
+                     "run_curl", "run_http"):
             word = self.vm.tick(name)
             self.assertIsNotNone(word, name)
             self.assertTrue(word.source.strip(), name)
+
+    def test_ai_tool_words_cache_system_info_and_run_host_commands(self):
+        import ai_tools
+
+        info = {
+            "os": "Windows",
+            "shells": {
+                "pwsh": {"available": True, "path": "pwsh.exe"},
+                "bash": {"available": True, "path": "bash"},
+                "curl": {"available": True, "path": "curl.exe"},
+            },
+            "wsl": {"available": True, "path": "wsl.exe", "distro": "Ubuntu"},
+        }
+        result = {"exit_code": 0, "stdout": "ok", "stderr": "", "timed_out": False, "truncated": False}
+        with patch.object(ai_tools, "_detect_system_info", return_value=info) as detect, \
+                patch.object(ai_tools, "_run_process", return_value=result) as run_process:
+            self.vm.dictate("system_info system_info")
+            self.assertIs(self.vm.pop(), info)
+            self.assertIs(self.vm.pop(), info)
+            detect.assert_called_once_with()
+
+            self.vm.push("Write-Output ok")
+            self.vm.dictate("run_pwsh")
+            self.assertEqual(self.vm.pop(), result)
+            run_process.assert_called_with(
+                ["pwsh.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "-"],
+                input_text="Write-Output ok")
+
+            self.vm.push("echo ok")
+            self.vm.dictate("run_bash")
+            self.assertEqual(self.vm.pop(), result)
+            run_process.assert_called_with(
+                ["wsl.exe", "-d", "Ubuntu", "--exec", "bash", "--noprofile", "--norc", "-s"],
+                input_text="echo ok")
+
+            self.vm.push(["-sS", "https://example.test"])
+            self.vm.dictate("run_curl")
+            self.assertEqual(self.vm.pop(), result)
+            run_process.assert_called_with(["curl.exe", "-sS", "https://example.test"])
+
+    def test_run_http_word_validates_in_forth_and_uses_python_transport(self):
+        import ai_tools
+
+        response = {"status_code": 200, "headers": {}, "body": "ok", "truncated": False}
+        with patch.object(ai_tools, "_http_request", return_value=response) as request:
+            self.vm.push({"url": "https://example.test", "method": "post",
+                          "headers": {"Content-Type": "text/plain"}, "body": "hello"})
+            self.vm.dictate("run_http")
+            self.assertEqual(self.vm.pop(), response)
+            request.assert_called_once_with("https://example.test", "POST",
+                                            {"Content-Type": "text/plain"}, "hello")
+
+            self.vm.push({"url": "file:///etc/passwd"})
+            self.vm.dictate("run_http")
+            self.assertIn("only supports absolute http:// or https://",
+                          self.vm.pop()["error"])
+            request.assert_called_once()
 
     def test_ai_context_returns_chat_or_complete_items(self):
         bridge = _f_mod.ai_bridge

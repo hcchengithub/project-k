@@ -156,10 +156,11 @@ python py\verify_projectk.py
 | `repl.py` | 跨平台 (Python 3) | **REPL 核心進入點**。負責初始化 VM、載入 `base.f`、`auxiliary.f` 和 `ai.f`、多行代碼緩衝處理，以及命令列引數解析 (`-e` 或指定檔案)。 |
 | `base.f` | 純 Forth 原始碼 | **核心字典正本 (Bootstrap)**。包含控制結構、字串家族、Defining Words、`see` 等核心 words，由 `repl.py` 啟動時載入。 |
 | `auxiliary.f` | Forth 擴充 | **輔助工具 words**。包含以 Forth `code` 直接定義的 `cls` 和 `stringify`。 |
-| `ai.f` | Forth 擴充 | **AI words 與流程**。以 `code` 和 colon words 定義 Agents API 的對話、工具交握、核准及 session 操作；傳輸與少量 Python host 功能由 `ai_bridge.py` 提供。 |
+| `ai.f` | Forth 擴充 | **AI words 與流程**。以 `code` 和 colon words 定義 Agents API 對話、工具交握、核准、session 操作及本機 AI tools；需要時由 Forth code import 下列 Python helper。 |
 | `ai_bridge.py` | Python 標準函式庫 | **AI 基礎 host 功能**。負責 HTTP/SSE、API 請求、session index 檔案，以及 Forth 執行輸出擷取。 |
+| `ai_tools.py` | Python 標準函式庫 | **本機 host 基礎功能**。保留程序執行、主機環境偵測和 HTTP 傳輸；對應的 Forth words 由 `ai.f` 定義。 |
 | `projectk.py` | 跨平台 (Python 3) | **微核心 VM 引擎**。定義 `VM`、雙 stack 容器、`Task` 狀態機、`_Word` 資料結構，以及 Python 原生代碼塊解析器。 |
-| `verify_projectk.py` | 跨平台 (Python 3) | **自動化驗證套件**。涵蓋 69 項測試。 |
+| `verify_projectk.py` | 跨平台 (Python 3) | **自動化驗證套件**。涵蓋 71 項測試。 |
 | `f.sh` | Linux / WSL | **Linux/WSL 啟動腳本**。解析符號連結，從 `PROJECTK_VENV` 選擇 Python 環境。 |
 | `f.cmd` / `f.bat` | Windows | **Windows 啟動腳本**。呼叫 PATH 上的 `python`；外部 VENV 需先啟用。 |
 
