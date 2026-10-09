@@ -133,8 +133,8 @@ flowchart TD
 | :--- | :--- | :--- |
 | `projectk.py` | 核心 VM 引擎 | 包含 `Input` 串流解析器、`_Word` 核心結構、`Task` 狀態機、`VM` 容器，以及原生 Python 代碼塊 (`code ... end-code`) 的語彙編譯機制。不預載任何高階 Forth 詞彙，純粹、輕量且原生支援 Coroutines。 |
 | `base.f` | Bootstrap 字典 | 以純粹的 Forth 語法撰寫之字典正本（800+ 行）。從 `code immediate` 起步，逐步自舉出控制結構、字串家族、Defining Words、`does>`、三階段 `see` 與 Python Host Bridge。各 Word 透過 `//` 與 `///` 內建完整說明文檔。 |
-| `repl.py` | 執行期與 REPL | 負責環境裝配、`readline` 命令歷史、多行貼上跳脫保護 (`bracketed paste`)、`code` 多行緩衝區收集，以及全域 CLI 進入點。 |
-| `f.sh` / `f.cmd` | 跨平台啟動器 | 動態解析 `%USERPROFILE%` 與 `PROJECTK_HOME`，支援 Linux/WSL 符號連結穿透與 Windows 一鍵啟動。 |
+| `repl.py` | 執行期與 REPL | 負責環境裝配、`prompt_toolkit` 多行輸入與編輯、整段貼上緩衝、`code` 多行緩衝區收集，以及全域 CLI 進入點。 |
+| `f.sh` / `f.cmd` / `f.bat` | 平台啟動器 | `f.sh` 讀取 `PROJECTK_VENV` 並使用 Linux/WSL VENV；Windows launcher 呼叫 PATH 上的 `python`，須由 Windows Python 環境提供 `prompt_toolkit`。 |
 
 ---
 
@@ -1108,50 +1108,34 @@ Project K 的代碼組織貫徹高內聚、低耦合原則：
 
 ### 9.2 全域環境部署機制：動態路徑轉發
 
-為了達成在終端機任意目錄輸入 `f` 即可啟動 Project K，系統建立了動態解析體系：
+若要在任意目錄輸入 `f` 啟動 Project K，可自行建立全域轉發腳本或符號連結。repo 內啟動器的行為如下：
 
-#### 1. 動態環境變數 `PROJECTK_HOME`
-啟動腳本優先檢查系統環境變數 `%PROJECTK_HOME%`（或 `$PROJECTK_HOME`）。若未設定，則自動退回當前使用者的個人家目錄路徑。
-
-#### 2. Windows (`f.cmd` / `f.bat`) 免寫死設計
-全面採用 Windows 動態變數 `%USERPROFILE%`：
+#### 1. Windows (`f.cmd` / `f.bat`)
+這兩個 repo 內的批次檔只會呼叫相鄰的 `repl.py`，並將參數轉交給 Windows PATH 上的 `python`：
 ```cmd
 @echo off
-setlocal
-if defined PROJECTK_HOME (
-    set "TARGET_DIR=%PROJECTK_HOME%\py"
-) else (
-    set "TARGET_DIR=%USERPROFILE%\OneDrive\Documents\GitHub\project-k\py"
-)
-python "%TARGET_DIR%\repl.py" %*
+python "%~dp0repl.py" %*
 ```
+Windows 互動式 REPL 需要在這個 Python 環境安裝 `prompt_toolkit`。若使用外部 Windows VENV，請先啟用該 VENV。WSL/Linux VENV 不能供 Windows Python 使用。
 
-#### 3. Linux / WSL (`f.sh`) 的符號連結深度解析
-當使用者將 `~/.local/bin/f` 軟連結至 `f.sh` 時，`${BASH_SOURCE[0]}` 只會拿到符號連結本身的路徑。`f.sh` 採用深度穿透解析：
-```bash
-TARGET="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || realpath "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
-SCRIPT_DIR="$(cd "$(dirname "$TARGET")" && pwd)"
-exec python3 "${SCRIPT_DIR}/repl.py" "$@"
-```
-這確保了無論如何建立 symlink，腳本永遠能正確定位鄰近的 `repl.py` 與 `base.f`。
+#### 2. Linux / WSL (`f.sh`)
+`f.sh` 會解析自身位置（包含符號連結），讀取 `py/.env` 的 `PROJECTK_VENV`，再使用該 Linux/WSL VENV 的 Python 執行 `repl.py`。可將 `~/.local/bin/f` 軟連結至 `f.sh`，在任意工作目錄啟動。
+
+全域 Windows 轉發腳本可使用 `PROJECTK_HOME` 或 `%USERPROFILE%` 找到 repo；這是使用者自行建立的 shim，不是 repo 內 `f.cmd` / `f.bat` 的行為。Windows shim 同樣使用 PATH 上的 Python，因此需啟用已安裝 REPL 依賴的 Windows VENV。
 
 ---
-
 ### 9.3 跨平台路徑與換行相容性
 
-在 Windows 與 WSL 共用 Git 倉庫的混合作業環境下，Project K 特別強化了終端穩健性：
-1. **Bracketed Paste 跳脫字元過濾**：
-   現代終端在貼上多行文字時會自動包裹 `\x1b[200~` 與 `\x1b[201~` 控制字元。`repl.py` 在接收輸入時即刻自動剔除，防止直譯器誤讀。
-2. **多行貼上爆發處理 (Paste Bursts)**：
-   單次貼入數十行 Forth 代碼時，REPL 自動拆解換行，逐行排程處理，並確保 `code ... end-code` 區塊在跨行貼上時平滑累積至緩衝區，直至終止符出現才觸發編譯。
+互動式 REPL 使用 `prompt_toolkit` 編輯完整輸入緩衝區。按 Enter 送出整個緩衝區；Ctrl+J 或 Esc 後再按 Enter 插入新行。多行貼上會保留在編輯器中，按 Enter 後作為一次輸入提交。`code ... end-code` 區塊也可跨行累積。
+
+Shift+Enter 只有在終端提供可區分的按鍵序列時才能使用。部分終端會把 Ctrl+Enter 傳成 Ctrl+J，因此它也可能插入新行。
 
 ---
-
 ### 9.4 自動化驗證套件
 
 系統品質由 `verify_projectk.py` 進行嚴密的持續整合驗證。
 
-套件涵蓋 **46 項端到端單元測試**：
+套件涵蓋 **53 項自動化測試**：
 * 基礎算術與大整數 / 浮點數精度
 * Data stack 與 Return stack 邊界與溢位保護
 * Colon 定義與 Immediate Word 編譯期行為
@@ -1162,4 +1146,4 @@ exec python3 "${SCRIPT_DIR}/repl.py" "$@"
 * `Task` 狀態機、`pause` 中斷與 `resume()` Coroutine 恢復
 * 三階段 `see` 與自文檔 `help` 查詢
 
-所有測試保證 100% 通過（`Ran 46 tests in 0.5s - OK`），為 Project K 的長期演進與架構穩健性提供最堅實的後盾。
+執行 `python -m unittest verify_projectk -q` 可驗證目前測試結果。

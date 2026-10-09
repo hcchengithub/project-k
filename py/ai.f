@@ -2,7 +2,7 @@
 \ This file documents the stable Forth-facing interface and its stack effects.
 \
 \ ai: <prompt> ( -- )
-\   Send the rest of this input line to the saved Agents API session.
+\   Send all text after ai: in the submitted input buffer to the saved Agents API session.
 \   While the agent works, its local Forth execution proposal pauses the VM
 \   until the REPL receives trust/yes/no/cancel input from the user.
 \   Trust approves later AI programs for this Forth process only.

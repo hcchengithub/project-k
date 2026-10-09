@@ -435,9 +435,9 @@ def install(vm):
             current_vm.push("".join(answer))
 
     def ai_line(current_vm):
-        current_vm.input._ensure_split()
-        current = current_vm.input.tib[current_vm.input.itib] if current_vm.input.itib < len(current_vm.input.tib) else ""
-        prompt = current_vm.input.rest().strip() if "\n" not in current else current_vm.input.read(until="\n").strip()
+        # The editor submits one complete buffer, so all lines after ai: are
+        # part of the user's prompt rather than separate Forth submissions.
+        prompt = current_vm.input.rest().strip()
         try:
             yield from run_prompt(current_vm, prompt)
         except KeyboardInterrupt:

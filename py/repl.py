@@ -12,9 +12,15 @@ if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 
 try:
-    import readline
+    from prompt_toolkit import PromptSession
+    from prompt_toolkit.input.ansi_escape_sequences import ANSI_SEQUENCES
+    from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.keys import Keys
 except ImportError:
-    pass
+    PromptSession = None
+    ANSI_SEQUENCES = None
+    KeyBindings = None
+    Keys = None
 
 from projectk import VM, ForthError
 import ai_bridge
@@ -93,9 +99,11 @@ def create_vm(base_file: str | None = None) -> VM:
 
 
 def _process_one_line(vm: VM, line: str, state: dict) -> None:
+    """Process one submitted editor buffer, which may contain multiple lines."""
+
     line = line.rstrip("\r\n")
 
-    # In multi-line code block mode (`code ... end-code`)
+    # Continue a host code block submitted over multiple editor buffers.
     if state["in_code_block"]:
         state["code_buffer"].append(line)
         block = "\n".join(state["code_buffer"])
@@ -132,12 +140,56 @@ def _process_one_line(vm: VM, line: str, state: dict) -> None:
         print(" ok")
 
 
+def _make_multiline_key_bindings(bindings_type=None):
+    bindings_type = bindings_type or KeyBindings
+    bindings = bindings_type()
+
+    @bindings.add("c-m")
+    def _submit(event):
+        event.current_buffer.validate_and_handle()
+
+    @bindings.add("escape", "c-m")
+    def _newline_with_escape_enter(event):
+        event.current_buffer.insert_text("\n")
+
+    @bindings.add("c-j")
+    def _newline_with_control_j(event):
+        event.current_buffer.insert_text("\n")
+
+    return bindings
+
+
+def _map_extended_enter_sequences(sequence_map, newline_key):
+    if sequence_map is None or newline_key is None:
+        return
+    for sequence in ("\x1b[27;2;13~", "\x1b[13;2u"):
+        sequence_map[sequence] = newline_key
+
+
 def repl(vm: VM | None = None) -> None:
     if vm is None:
         vm = create_vm()
 
+    if PromptSession is None:
+        requirements = os.path.join(SCRIPT_DIR, "requirements.txt")
+        print("Interactive REPL requires prompt_toolkit. Install it with: "
+              f'{sys.executable} -m pip install -r "{requirements}"', file=sys.stderr)
+        return
+
+    # Modified Enter is reported distinctly only by terminals with extended
+    # key support. Map the common xterm and Kitty encodings to the newline key.
+    _map_extended_enter_sequences(ANSI_SEQUENCES, Keys.ControlJ if Keys is not None else None)
+
+    prompt_session = PromptSession(
+        multiline=True,
+        key_bindings=_make_multiline_key_bindings(),
+        prompt_continuation=lambda width, line_number, is_soft_wrap: "... ",
+    )
+    confirmation_session = PromptSession(multiline=False)
+
     print("Project K Forth REPL")
-    print("Type 'words' to list words, 'ai: <prompt>' to ask AI, or 'bye'/Ctrl-D to exit.\n")
+    print("Enter submits; Ctrl+J or Esc then Enter adds a line. Shift+Enter depends on terminal support.")
+    print("Type 'words' to list words, 'ai:' to ask AI, or 'bye'/Ctrl-D to exit.\n")
 
     state = {"in_code_block": False, "code_buffer": [], "ai_task": None,
              "queued": deque(), "displayed_approval": None}
@@ -165,78 +217,75 @@ def repl(vm: VM | None = None) -> None:
                 _process_one_line(vm, raw_input, state)
                 continue
             else:
-                prompt = "... " if state["in_code_block"] or vm.compiling else "> "
-            raw_input = input(prompt)
+                prompt = ("... " if state["in_code_block"] or vm.compiling else
+                          "> ")
+            active_prompt = confirmation_session if pending or cleanup else prompt_session
+            raw_input = active_prompt.prompt(prompt)
 
-            # Strip bracketed paste escape sequences if present
-            clean_input = re.sub(r"\x1b\[20[01]~", "", raw_input)
-            clean_input = clean_input.replace("\r\n", "\n").replace("\r", "\n")
+            clean_input = raw_input.replace("\r\n", "\n").replace("\r", "\n")
 
-            # Support pasting multiple lines in a single paste burst
-            lines = clean_input.split("\n")
-            for line in lines:
-                pending = vm.host.get("ai_pending_approval")
-                cleanup = vm.host.get("ai_cleanup_pending")
-                if cleanup and not pending:
-                    choice = line.strip().casefold()
-                    if choice == "delete":
-                        vm.host["ai_cleanup_result"] = True
-                    elif choice == "cancel":
-                        vm.host["ai_cleanup_result"] = False
-                    else:
-                        if line.strip():
-                            state["queued"].append(line)
-                        continue
-                    vm.host.pop("ai_cleanup_pending", None)
-                    task = state.get("ai_task")
-                    state["ai_task"] = None
-                    if task:
-                        task.resume()
-                        if task.status == "paused" and (vm.host.get("ai_pending_approval") or vm.host.get("ai_cleanup_pending")):
-                            state["ai_task"] = task
-                        elif task.status == "done":
-                            print(" ok")
-                    vm.host.pop("ai_cleanup_result", None)
-                    continue
-                if pending:
-                    choice = line.strip().casefold()
-                    if choice in {"trust", "yes", "y"}:
-                        vm.host["ai_approval_result"] = "trust" if choice == "trust" else True
-                    elif choice in {"no", "n"}:
-                        vm.host["ai_approval_result"] = False
-                    elif choice in {"cancel", "ai-cancel"}:
-                        task = state.get("ai_task")
-                        try:
-                            ai_bridge.cancel_turn()
-                        except Exception as err:
-                            print(f"Could not cancel remote turn: {err}")
-                        if task:
-                            task.cancel()
-                        state["ai_task"] = None
-                        vm.host.pop("ai_pending_approval", None)
-                        vm.host.pop("ai_approval_result", None)
-                        state["displayed_approval"] = None
-                        print("AI task cancelled locally.")
-                        continue
-                    else:
-                        if line.strip():
-                            state["queued"].append(line)
-                        continue
-                    vm.host.pop("ai_pending_approval", None)
-                    state["displayed_approval"] = None
-                    task = state.get("ai_task")
-                    state["ai_task"] = None
-                    if task:
-                        task.resume()
-                        if task.status == "paused" and vm.host.get("ai_pending_approval"):
-                            state["ai_task"] = task
-                        elif task.status == "done":
-                            print(" ok")
-                    continue
-                if state["queued"]:
-                    state["queued"].append(line)
+            pending = vm.host.get("ai_pending_approval")
+            cleanup = vm.host.get("ai_cleanup_pending")
+            if cleanup and not pending:
+                choice = clean_input.strip().casefold()
+                if choice == "delete":
+                    vm.host["ai_cleanup_result"] = True
+                elif choice == "cancel":
+                    vm.host["ai_cleanup_result"] = False
                 else:
-                    _process_one_line(vm, line, state)
+                    if clean_input.strip():
+                        state["queued"].append(clean_input)
+                    continue
+                vm.host.pop("ai_cleanup_pending", None)
+                task = state.get("ai_task")
+                state["ai_task"] = None
+                if task:
+                    task.resume()
+                    if task.status == "paused" and (vm.host.get("ai_pending_approval") or vm.host.get("ai_cleanup_pending")):
+                        state["ai_task"] = task
+                    elif task.status == "done":
+                        print(" ok")
+                vm.host.pop("ai_cleanup_result", None)
+                continue
+            if pending:
+                choice = clean_input.strip().casefold()
+                if choice in {"trust", "yes", "y"}:
+                    vm.host["ai_approval_result"] = "trust" if choice == "trust" else True
+                elif choice in {"no", "n"}:
+                    vm.host["ai_approval_result"] = False
+                elif choice in {"cancel", "ai-cancel"}:
+                    task = state.get("ai_task")
+                    try:
+                        ai_bridge.cancel_turn()
+                    except Exception as err:
+                        print(f"Could not cancel remote turn: {err}")
+                    if task:
+                        task.cancel()
+                    state["ai_task"] = None
+                    vm.host.pop("ai_pending_approval", None)
+                    vm.host.pop("ai_approval_result", None)
+                    state["displayed_approval"] = None
+                    print("AI task cancelled locally.")
+                    continue
+                else:
+                    if clean_input.strip():
+                        state["queued"].append(clean_input)
+                    continue
+                vm.host.pop("ai_pending_approval", None)
+                state["displayed_approval"] = None
+                task = state.get("ai_task")
+                state["ai_task"] = None
+                if task:
+                    task.resume()
+                    if task.status == "paused" and vm.host.get("ai_pending_approval"):
+                        state["ai_task"] = task
+                    elif task.status == "done":
+                        print(" ok")
+                continue
+            if state["queued"]:
+                state["queued"].append(clean_input)
+            else:
+                _process_one_line(vm, clean_input, state)
 
         except ForthError as err:
             print(f"Error: {err}")

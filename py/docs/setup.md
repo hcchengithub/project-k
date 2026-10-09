@@ -5,21 +5,60 @@
 
 ---
 
-## ⚡ 最速上手（3 秒直接跑起來）
+## ⚡ 快速上手（首次設定後即可啟動）
 
-只要本機安裝了 Python 3 (3.10+)，不需要任何第三方套件，在專案根目錄下直接執行：
+核心 VM 只需要 Python 3 (3.10+)。互動式 REPL 需要 `prompt_toolkit`，請把它安裝在執行 REPL 的 Python 環境中。WSL/Linux 和 Windows 使用不同的 VENV，不能共用同一個環境；兩者都可放在 repo 外，避免 OneDrive 同步虛擬環境。
+
+#### Linux / WSL（Bash）
+
+在 `py/.env` 設定 Linux/WSL 的外部 VENV：
+
+```dotenv
+PROJECTK_VENV=~/venvs/project-k
+```
+
+從 repo 根目錄建立環境並安裝依賴：
+
+```bash
+uv venv ~/venvs/project-k
+uv pip install --python ~/venvs/project-k/bin/python -r py/requirements.txt
+```
+
+`./py/f.sh` 會讀取 `py/.env` 的 `PROJECTK_VENV`，並使用該 Linux/WSL VENV。
+
+#### Windows（PowerShell / CMD）
+
+Windows 必須有自己的 Windows VENV。以下範例在 `%USERPROFILE%\.venvs\project-k` 建立環境並安裝 REPL 依賴。
+
+PowerShell：
+```powershell
+uv venv "$env:USERPROFILE\.venvs\project-k"
+uv pip install --python "$env:USERPROFILE\.venvs\project-k\Scripts\python.exe" -r py\requirements.txt
+. "$env:USERPROFILE\.venvs\project-k\Scripts\Activate.ps1"
+```
+
+CMD：
+```cmd
+uv venv "%USERPROFILE%\.venvs\project-k"
+uv pip install --python "%USERPROFILE%\.venvs\project-k\Scripts\python.exe" -r py\requirements.txt
+call "%USERPROFILE%\.venvs\project-k\Scripts\activate.bat"
+```
+
+啟用 VENV 後，Windows 的 `python py\repl.py`、`py\f.cmd` 和 `py\f.bat` 才會使用這個環境。兩個批次檔只呼叫 PATH 上的 `python`；也可改用已安裝依賴的 Windows Python。WSL 的 `~/venvs/project-k` 不會被 Windows launcher 使用。
 
 ### 1. 互動式 REPL 模式
 
 ```bash
 # Linux / WSL 終端機：
-python3 py/repl.py
+./py/f.sh
 
-# Windows (PowerShell / CMD)：
-python py\repl.py
+# Windows PowerShell（先啟用 Windows VENV）：
+.\py\f.cmd
+
+# Windows CMD（先啟用 Windows VENV）：
+py\f.cmd
 ```
-
-看到 `Project K Forth REPL` 提示字元後，鍵入基礎算術驗證：
+在 REPL 中，Enter 送出整個編輯框；Ctrl+J 或 Esc 後再按 Enter 插入新行。Shift+Enter 只有在終端提供可區分的按鍵序列時才能使用；部分終端也可能把 Ctrl+Enter 傳成 Ctrl+J，因此它會插入新行。多行貼上會完整保留在編輯框內，不會逐行執行。看到 `Project K Forth REPL` 後，可鍵入基礎算術驗證：
 ```forth
 > 10 20 + . cr
 30
@@ -47,7 +86,7 @@ python py\repl.py -e "50 50 + . cr bye"
 
 如果你切換進 `py/` 目錄：
 * **Linux / WSL**：`./f.sh`
-* **Windows**：`.\f.cmd`
+* **Windows**（先啟用已安裝 REPL 依賴的 Windows VENV）：`.\f.cmd`
 
 ---
 
@@ -58,7 +97,7 @@ python py\repl.py -e "50 50 + . cr bye"
 ### A. Windows (PowerShell / CMD) 設定
 
 1. **建立全域轉發腳本**：  
-   在已經加入系統 `PATH` 的目錄（推薦為 `%USERPROFILE%\.local\bin`）中建立 `f.cmd` 與 `f.bat`：
+   在已經加入系統 `PATH` 的目錄（推薦為 `%USERPROFILE%\.local\bin`）中建立全域 `f.cmd` 與 `f.bat`。它們也會呼叫 PATH 上的 `python`；使用外部 Windows VENV 時，請先啟用該 VENV：
 
    ```cmd
    @echo off
@@ -93,25 +132,21 @@ python py\repl.py -e "50 50 + . cr bye"
 
 ---
 
-## 🧪 健全度驗證：46 項自動化單元測試
+## 🧪 自動化測試
 
-要確認整個 Forth VM 內核與 Bootstrap 字典運作 100% 正常，直接執行測試套件：
+在專案根目錄執行：
 
 ```bash
+# Linux / WSL
 python3 py/verify_projectk.py
+
+# Windows PowerShell / CMD
+python py\verify_projectk.py
 ```
 
-**預期輸出**：
-```text
-..............................................
-----------------------------------------------------------------------
-Ran 46 tests in 0.5s
-
-OK
-```
+目前套件包含 53 項自動化測試。
 
 ---
-
 ## 📂 檔案角色分工一覽
 
 專案目錄 `py/` 下各檔案各司其職：
@@ -121,9 +156,9 @@ OK
 | `repl.py` | 跨平台 (Python 3) | **REPL 核心進入點**。負責初始化 VM、載入 `base.f`、多行代碼緩衝處理，以及命令列引數解析 (`-e` 或指定檔案)。 |
 | `base.f` | 純 Forth 原始碼 | **核心字典正本 (Bootstrap)**。約 870 行純 Forth 程式碼，包含控制結構、字串家族、Defining Words、`see` 等，由 `repl.py` 啟動時自動加載。 |
 | `projectk.py` | 跨平台 (Python 3) | **微核心 VM 引擎**。定義 `VM`、雙 stack 容器、`Task` 狀態機、`_Word` 資料結構，以及 Python 原生代碼塊解析器。 |
-| `verify_projectk.py` | 跨平台 (Python 3) | **端到端驗證套件**。涵蓋 46 項自動化單元測試。 |
-| `f.sh` | Linux / WSL | **Linux 啟動腳本**。內建符號連結深度解析。 |
-| `f.cmd` / `f.bat` | Windows | **Windows 啟動腳本**。支援 `%USERPROFILE%` 與 `%PROJECTK_HOME%` 動態轉發。 |
+| `verify_projectk.py` | 跨平台 (Python 3) | **自動化驗證套件**。涵蓋 53 項測試。 |
+| `f.sh` | Linux / WSL | **Linux/WSL 啟動腳本**。解析符號連結，從 `PROJECTK_VENV` 選擇 Python 環境。 |
+| `f.cmd` / `f.bat` | Windows | **Windows 啟動腳本**。呼叫 PATH 上的 `python`；外部 VENV 需先啟用。 |
 
 ---
 

@@ -272,6 +272,74 @@ class ReplBootstrapTests(unittest.TestCase):
     def setUp(self):
         self.vm = _f_mod.create_vm()
 
+    def test_multiline_editor_submission_runs_as_one_forth_buffer(self):
+        state = {"in_code_block": False, "code_buffer": [], "ai_task": None}
+        with contextlib.redirect_stdout(io.StringIO()):
+            _f_mod._process_one_line(self.vm, ": square\n dup *\n;\n5 square", state)
+        self.assertEqual(self.vm.pop(), 25)
+
+    def test_multiline_ai_prompt_is_preserved_as_one_message(self):
+        state = {"in_code_block": False, "code_buffer": [], "ai_task": None}
+        received = []
+
+        def fake_ask(vm, prompt):
+            received.append(prompt)
+            yield {"kind": "text", "text": "First line.\nSecond line."}
+            yield {"kind": "text_done", "text": "First line.\nSecond line."}
+
+        original_ask = _f_mod.ai_bridge.ask
+        _f_mod.ai_bridge.ask = fake_ask
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                _f_mod._process_one_line(self.vm, "ai: First line.\nSecond line.", state)
+        finally:
+            _f_mod.ai_bridge.ask = original_ask
+
+        self.assertEqual(received, ["First line.\nSecond line."])
+
+    def test_multiline_key_bindings_submit_and_insert_newlines(self):
+        class RecordingBindings:
+            def __init__(self):
+                self.handlers = {}
+
+            def add(self, *keys):
+                def register(handler):
+                    self.handlers[keys] = handler
+                    return handler
+                return register
+
+        bindings = _f_mod._make_multiline_key_bindings(RecordingBindings)
+
+        class Buffer:
+            def __init__(self):
+                self.inserted = []
+                self.submitted = False
+
+            def insert_text(self, text):
+                self.inserted.append(text)
+
+            def validate_and_handle(self):
+                self.submitted = True
+
+        class Event:
+            def __init__(self):
+                self.current_buffer = Buffer()
+
+        enter = Event()
+        bindings.handlers[("c-m",)](enter)
+        self.assertTrue(enter.current_buffer.submitted)
+
+        for keys in (("c-j",), ("escape", "c-m")):
+            event = Event()
+            bindings.handlers[keys](event)
+            self.assertEqual(event.current_buffer.inserted, ["\n"])
+
+    def test_modified_enter_sequences_map_to_newline(self):
+        sequences = {}
+        _f_mod._map_extended_enter_sequences(sequences, "c-j")
+        self.assertEqual(sequences["\x1b[27;2;13~"], "c-j")
+        self.assertEqual(sequences["\x1b[13;2u"], "c-j")
+
     def test_help_and_comment(self):
         self.vm.dictate(': hi s" Hello!" . ; // ( -- ) Greeting\n/// Line 1\n/// Line 2\n')
         word = self.vm.tick('hi')

@@ -6,13 +6,13 @@
 
 ## 1. 啟動 Forth
 
-在專案根目錄執行：
+先依 [`setup.md`](setup.md) 安裝互動式 REPL 依賴；WSL/Linux 與 Windows 必須使用各自的 Python VENV。在專案根目錄啟動：
 
 ```bash
-# Linux / WSL
-python3 py/repl.py
+# Linux / WSL（使用 py/.env 設定的外部 VENV）
+./py/f.sh
 
-# Windows PowerShell / CMD
+# Windows PowerShell / CMD（先啟用已安裝 prompt_toolkit 的 Windows VENV）
 python py\repl.py
 ```
 
@@ -250,5 +250,9 @@ Forth 的 `pause` 可讓目前 Task 暫停，之後由 Python host 呼叫同一�
 更多啟動方式與環境設定請看 [`setup.md`](setup.md)；深入核心設計請看 [`manual-py.md`](manual-py.md)。如果你想驗證整套 Python 實作，可在專案根目錄執行：
 
 ```bash
+# Linux / WSL
 python3 py/verify_projectk.py
+
+# Windows PowerShell / CMD
+python py\verify_projectk.py
 ```

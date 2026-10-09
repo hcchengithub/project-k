@@ -18,7 +18,7 @@ Keep `.env` private. The local bridge sends the API key only as the HTTPS bearer
 
 ## Forth interface
 
-- `ai: <prompt>` sends the rest of the current line and streams the reply in the terminal.
+- `ai: <prompt>` sends the complete submitted input buffer after `ai:` and streams the reply in the terminal. The buffer may contain multiple lines.
 - `(ai) ( prompt-string -- response-string )` consumes a string and pushes the response, for example: `s" Give me a short greeting" (ai) . cr`.
 - `ai-status` displays the active session ID and the number of locally indexed sessions.
 - `ai-sessions` fetches the remote session list, newest first, and assigns sequence numbers for management words. The displayed sequence is a snapshot; run this again to refresh it.
