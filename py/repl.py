@@ -161,7 +161,6 @@ def _process_repl_input(vm: VM, line: str, state: dict) -> None:
 
 
 def _farewell(vm: VM) -> None:
-    print("\nbye")
     try:
         ai_bridge.refresh_session_index(vm)
     except Exception as err:
@@ -171,10 +170,9 @@ def _farewell(vm: VM) -> None:
     if session_id:
         title = ai_bridge._session_title(session_id) or "(untitled)"
         short_id = ai_bridge._short_id(session_id)
-        print(f"Current AI session: {title} [{short_id}]")
-        print(f'To resume it in a future Forth run, enter: s" {session_id}" ai-use')
+        print(f'To resume it in a future Forth run, enter: s" {session_id}" ai-use\n')
     else:
-        print("No AI session is selected in this Forth run.")
+        print("No AI session is selected in this Forth run.\n")
 
 
 def _latest_idle_session(rows):
