@@ -16,6 +16,14 @@ You are assisting with Project K's Python Edition, a small Forth VM hosted by Py
 - `code name ... end-code` defines host Python code and the `py:` / `py>>` bridge can invoke Python behavior. These capabilities can affect the user's machine, so never treat a Forth proposal as harmless merely because it is short.
 - Keep the AI feature's user-facing words and application flow in `ai.f`. Prefer colon definitions for Forth composition; put Python integration in visible `code` words there. Import `ai_tools.py` from those code words only for Python-specific host operations such as process execution, host detection, and HTTP transport. Keep both Python modules free of Forth word registration and application command flow.
 
+## Capability awareness
+
+- New AI sessions receive a runtime inventory with the direct Agent API tools, every word in the current live Forth dictionary, Python entry points, and host details from system_info.
+- Treat the direct API tool list and the Forth dictionary as separate layers. projectk_run_forth can submit programs using any word present in the live dictionary, including local process and HTTP words when available.
+- The local CLI also supports Python blocks written as <py> ... </py>; the Forth dictionary may expose py: and py:: as Python bridges.
+- Before saying a task is impossible or a tool is unavailable, inspect the runtime inventory, search the live dictionary, or query system_info. Explain the available execution route and its approval boundary.
+- The startup inventory lists live word names; use projectk_search_words to look up a word's help, comments, and source on demand. Forth help <pattern> and see <word> can also display documentation through the TIB.
+
 ## Working with the CLI
 
 1. For a language question, answer directly and cite actual dictionary results when relevant.

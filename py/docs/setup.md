@@ -1,188 +1,82 @@
-# Project K 如何執行 (How to Run)
+# Project K 安裝與啟動
 
-> 本文件專注於**「如何以最快方式讓程式跑起來」**與執行環境的配置指南。  
-> 關於 Project K 的架構設計理念、雙 stack 模型與語彙核心機制，請參閱核心手冊 [`manual-py.md`](manual-py.md)。手冊與本指南分開的原因在於：**手冊記錄的是穩定不變的設計理念，而如何執行與環境配置方式則會隨工具鏈演進而隨時迭代**。
+本指南適用於一般使用者。請在已 clone 的 Project K repo 根目錄執行對應作業系統的步驟。Linux/WSL 和 Windows 各自需要一個 Python 3.10+ venv；兩者不能共用。REPL 依賴會從 py/requirements.txt 安裝。
 
----
+每個系統只需一個全域 hook：
+- Linux/WSL：~/.local/bin/f
+- Windows：%USERPROFILE%\.local\bin\f.cmd
 
-## ⚡ 快速上手（首次設定後即可啟動）
+Windows 的 PowerShell 和 CMD 共用 f.cmd。hook 會直接呼叫 venv 裡的 Python，不必先 activate。
 
-核心 VM 只需要 Python 3 (3.10+)。互動式 REPL 需要 `prompt_toolkit`，請把它安裝在執行 REPL 的 Python 環境中。WSL/Linux 和 Windows 使用不同的 VENV，不能共用同一個環境；兩者都可放在 repo 外，避免 OneDrive 同步虛擬環境。
+## Linux / WSL
 
-#### Linux / WSL（Bash）
+在 repo 根目錄執行：
 
-在 `py/.env` 設定 Linux/WSL 的外部 VENV：
+~~~bash
+PROJECT_ROOT="$(pwd)"
+VENV="$HOME/.venvs/project-k"
 
-```dotenv
-PROJECTK_VENV=~/venvs/project-k
-```
+python3 -m venv "$VENV"
+"$VENV/bin/python" -m pip install -r "$PROJECT_ROOT/py/requirements.txt"
 
-從 repo 根目錄建立環境並安裝依賴：
+mkdir -p "$HOME/.local/bin"
+cat > "$HOME/.local/bin/f" <<EOF
+#!/usr/bin/env bash
+exec "$VENV/bin/python" "$PROJECT_ROOT/py/repl.py" "\$@"
+EOF
+chmod +x "$HOME/.local/bin/f"
+~~~
 
-```bash
-uv venv ~/venvs/project-k
-uv pip install --python ~/venvs/project-k/bin/python -r py/requirements.txt
-```
+確保 ~/.local/bin 在 PATH 中。若尚未加入，將下列一行放入 ~/.profile：
 
-`./py/f.sh` 會讀取 `py/.env` 的 `PROJECTK_VENV`，並使用該 Linux/WSL VENV。
+~~~bash
+export PATH="$HOME/.local/bin:$PATH"
+~~~
 
-#### Windows（PowerShell / CMD）
+開啟新的終端機後即可在任何目錄輸入 f。
 
-Windows 必須有自己的 Windows VENV。以下範例在 `%USERPROFILE%\.venvs\project-k` 建立環境並安裝 REPL 依賴。
+## Windows PowerShell / CMD
 
-PowerShell：
-```powershell
-uv venv "$env:USERPROFILE\.venvs\project-k"
-uv pip install --python "$env:USERPROFILE\.venvs\project-k\Scripts\python.exe" -r py\requirements.txt
-. "$env:USERPROFILE\.venvs\project-k\Scripts\Activate.ps1"
-```
+在 repo 根目錄開啟 PowerShell，執行：
 
-CMD：
-```cmd
-uv venv "%USERPROFILE%\.venvs\project-k"
-uv pip install --python "%USERPROFILE%\.venvs\project-k\Scripts\python.exe" -r py\requirements.txt
-call "%USERPROFILE%\.venvs\project-k\Scripts\activate.bat"
-```
+~~~powershell
+$Project = (Get-Location).Path
+$Venv = Join-Path $env:USERPROFILE '.venvs\project-k'
+py -3 -m venv $Venv
 
-啟用 VENV 後，Windows 的 `python py\repl.py`、`py\f.cmd` 和 `py\f.bat` 才會使用這個環境。兩個批次檔只呼叫 PATH 上的 `python`；也可改用已安裝依賴的 Windows Python。WSL 的 `~/venvs/project-k` 不會被 Windows launcher 使用。
+$Python = Join-Path $Venv 'Scripts\python.exe'
+& $Python -m pip install -r (Join-Path $Project 'py\requirements.txt')
 
-### 1. 互動式 REPL 模式
+$Bin = Join-Path $env:USERPROFILE '.local\bin'
+New-Item -ItemType Directory -Force $Bin | Out-Null
+$Repl = Join-Path $Project 'py\repl.py'
+$Launcher = Join-Path $Bin 'f.cmd'
 
-```bash
-# Linux / WSL 終端機：
-./py/f.sh
+@"
+@echo off
+"$Python" "$Repl" %*
+exit /b %ERRORLEVEL%
+"@ | Set-Content -Encoding ascii $Launcher
 
-# Windows PowerShell（先啟用 Windows VENV）：
-.\py\f.cmd
+$UserPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+$PathEntries = @($UserPath -split ';' | Where-Object { $_ })
+if ($PathEntries -notcontains $Bin) {
+    [Environment]::SetEnvironmentVariable(
+        'Path',
+        (($PathEntries + $Bin) -join ';'),
+        'User'
+    )
+}
+~~~
 
-# Windows CMD（先啟用 Windows VENV）：
-py\f.cmd
-```
-在 REPL 中，Enter 送出整個編輯框；Ctrl+J 或 Esc 後再按 Enter 插入新行。Shift+Enter 只有在終端提供可區分的按鍵序列時才能使用；部分終端也可能把 Ctrl+Enter 傳成 Ctrl+J，因此它會插入新行。多行貼上會完整保留在編輯框內，不會逐行執行。看到 `Project K Forth REPL` 後，可鍵入基礎算術驗證：
-```forth
-> 10 20 + . cr
-30
-> bye
-```
-*(輸入 `bye` 或按下 `Ctrl+D` 即可隨時退出)*
+關閉並重新開啟 PowerShell 或 CMD，之後便可在任何目錄輸入 f。這個 Windows venv 同時供兩種 shell 使用。
 
----
+## 啟動與環境資訊
 
-### 2. 命令列執行與互動模式
+在任意工作目錄輸入：
 
-`-e` 會把後面所有命令列參數依序以一個空格接起來，當成單一 TIB 執行；預設執行完就結束。使用 `-i` 可在執行後保留 VM，進入 REPL。`-c` 或 `--chat` 會把後面所有參數以一個空格接成 prompt，直接交給 `(ai)`，並接續 `last_active_at` 最新的 idle session；若沒有 session 就建立一個。加上 `-new` 可強制建立新 session。預設完成後結束，也可在前面加 `-i` 繼續互動。`-h` 顯示完整說明：
+~~~text
+f
+~~~
 
-```bash
-# Linux / WSL
-python3 py/repl.py -e 10 20 + . cr
-python3 py/repl.py -i -e 10 20 + . cr
-python3 py/repl.py -c 'What is 10 plus 20?'
-python3 py/repl.py -new -c 'Start a separate conversation'
-python3 py/repl.py -i --chat 'What is 10 plus 20?'
-python3 py/repl.py -h
-
-# Windows
-python py\repl.py -e 50 50 + . cr
-python py\repl.py -i -e 50 50 + . cr
-python py\repl.py -c "What is 10 plus 20?"
-```
-
-`-i` 單獨使用會直接開啟互動 REPL；也可以放在 Forth 檔案路徑前後，例如 `f -i program.f`。`-e` 和 `-c` 後方的所有參數分別屬於 Forth 輸入與 AI prompt，因此需要互動時，請把 `-i` 放在它們前面。也可以把含空格或 shell 特殊字元的內容用引號包起來。
-
----
-
-### 3. 本地快捷腳本
-
-如果你切換進 `py/` 目錄：
-* **Linux / WSL**：`./f.sh`
-* **Windows**（先啟用已安裝 REPL 依賴的 Windows VENV）：`.\f.cmd`
-
----
-
-## 🛠️ 全域命令配置（在任何目錄敲 `f` 就能執行）
-
-若希望在作業系統的**任意工作目錄**下，只需輸入 `f` 即可立即喚起 Project K，請依據你的作業系統進行以下極簡設定：
-
-### A. Windows (PowerShell / CMD) 設定
-
-1. **建立全域轉發腳本**：  
-   在已經加入系統 `PATH` 的目錄（推薦為 `%USERPROFILE%\.local\bin`）中建立全域 `f.cmd` 與 `f.bat`。它們也會呼叫 PATH 上的 `python`；使用外部 Windows VENV 時，請先啟用該 VENV：
-
-   ```cmd
-   @echo off
-   if not defined PROJECTK_HOME (
-       set "PROJECTK_HOME=%USERPROFILE%\OneDrive\Documents\GitHub\project-k"
-   )
-   python "%PROJECTK_HOME%\py\repl.py" %*
-   ```
-
-2. **設定環境變數 `PROJECTK_HOME` (選用，支援專案任意搬遷)**：  
-   在 CMD 中執行：
-   ```cmd
-   setx PROJECTK_HOME "%USERPROFILE%\OneDrive\Documents\GitHub\project-k"
-   ```
-
----
-
-### B. Linux / WSL (Bash / Zsh) 設定
-
-1. **建立全域符號連結 (Symbolic Link)**：  
-   在使用者專屬的 `~/.local/bin` 目錄下建立軟連結，直接指向專案的 `f.sh`：
-
-   ```bash
-   ln -sfn /path/to/project-k/py/f.sh ~/.local/bin/f
-   ```
-
-2. **確認 PATH**：  
-   確保 `~/.local/bin` 已加入使用者的環境變數（若未加入，可在 `~/.bashrc` 加入 `export PATH="$HOME/.local/bin:$PATH"`）。
-
-3. **符號連結穿透解析 (內部機制)**：  
-   `f.sh` 內建自動穿透解析技術（`readlink -f`），即使透過符號連結呼叫，也能自動精確找到同目錄下的 `repl.py` 與 `base.f`，無須依賴固定的執行目錄。
-
----
-
-## 🧪 自動化測試
-
-在專案根目錄執行：
-
-```bash
-# Linux / WSL
-python3 py/verify_projectk.py
-
-# Windows PowerShell / CMD
-python py\verify_projectk.py
-```
-
-目前套件包含 65 項自動化測試。
-
----
-## 📂 檔案角色分工一覽
-
-專案目錄 `py/` 下各檔案各司其職：
-
-| 檔案 | 適用環境 | 角色與內容說明 |
-| :--- | :--- | :--- |
-| `repl.py` | 跨平台 (Python 3) | **REPL 核心進入點**。負責初始化 VM、載入 `base.f`、`auxiliary.f` 和 `ai.f`、多行代碼緩衝處理，以及命令列引數解析 (`-e` 或指定檔案)。 |
-| `base.f` | 純 Forth 原始碼 | **核心字典正本 (Bootstrap)**。包含控制結構、字串家族、Defining Words、`see` 等核心 words，由 `repl.py` 啟動時載入。 |
-| `auxiliary.f` | Forth 擴充 | **輔助工具 words**。包含以 Forth `code` 直接定義的 `cls` 和 `stringify`。 |
-| `ai.f` | Forth 擴充 | **AI words 與流程**。以 `code` 和 colon words 定義 Agents API 對話、工具交握、核准、session 操作及本機 AI tools；需要時由 Forth code import 下列 Python helper。 |
-| `ai_bridge.py` | Python 標準函式庫 | **AI 基礎 host 功能**。負責 HTTP/SSE、API 請求、session index 檔案，以及 Forth 執行輸出擷取。 |
-| `ai_tools.py` | Python 標準函式庫 | **本機 host 基礎功能**。保留程序執行、主機環境偵測和 HTTP 傳輸；對應的 Forth words 由 `ai.f` 定義。 |
-| `projectk.py` | 跨平台 (Python 3) | **微核心 VM 引擎**。定義 `VM`、雙 stack 容器、`Task` 狀態機、`_Word` 資料結構，以及 Python 原生代碼塊解析器。 |
-| `verify_projectk.py` | 跨平台 (Python 3) | **自動化驗證套件**。涵蓋 71 項測試。 |
-| `f.sh` | Linux / WSL | **Linux/WSL 啟動腳本**。解析符號連結，從 `PROJECTK_VENV` 選擇 Python 環境。 |
-| `f.cmd` / `f.bat` | Windows | **Windows 啟動腳本**。呼叫 PATH 上的 `python`；外部 VENV 需先啟用。 |
-
----
-
-## 🔍 常見排錯經驗 (Troubleshooting)
-
-1. **PowerShell 當前目錄執行規則**：
-   * **現象**：在 `py/` 目錄下直接打 `f` 顯示找不到命令。
-   * **解法**：PowerShell 預設基於安全性不搜尋當前目錄，請打 `.\f.cmd`，或在設定好全域 PATH 後於任意目錄直接打 `f`。
-2. **Git Dubious Ownership (WSL 與 Windows 跨區掛載)**：
-   * **現象**：在 WSL 中對掛載磁碟 `/mnt/c/...` 執行 git 時出現 `fatal: detected dubious ownership`。
-   * **解法**：執行 `git config --global --add safe.directory /mnt/c/Users/<Your-Username>/...` 將專案加入信任清單。
-3. **路徑移轉與環境變數快取**：
-   * **現象**：專案改名或移至其他硬碟後無法啟動。
-   * **解法**：更新 `PROJECTK_HOME` 環境變數或確認符號連結指向最新目錄。
+REPL 啟動後，可輸入 `system_info stringify . ` 查看目前 Python、venv、shell 與 Project K source_path。

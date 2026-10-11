@@ -38,16 +38,21 @@ end-code
 
 code system_info
     import ai_tools
+    from pathlib import Path
 
     word = vm.words["system_info"]
     info = word.properties.get("system_info")
     if info is None:
         info = ai_tools._detect_system_info()
-        word.properties["system_info"] = info
+
+    source_path = str(Path(ai_tools.__file__).resolve().parent)
+    info["source_path"] = source_path
+    word.properties["system_info"] = info
     vm.push(info)
 end-code
-// ( -- info ) Return cached host, Python venv, WSL, and shell details.
-/// The first call detects the host and caches stable details on this word object's properties for this VM lifetime.
+// ( -- info ) Return cached host, Python venv, Project K source paths, WSL, and shell details.
+/// source_path points to the py directory containing Project K's Forth and Python source files.
+/// Host details and paths are cached on this word object's properties for this VM lifetime.
 
 code (ai-tool-error)
     message = vm.pop()
@@ -190,15 +195,48 @@ code (ai)
          "parameters": {"type": "object", "properties": {"source": {"type": "string"}, "purpose": {"type": "string"}},
                         "required": ["source", "purpose"], "additionalProperties": False}},
     ]
-    payload = {
-        "agent": {"model": os.environ.get("PROJECTK_AI_MODEL", "gpt-6-astra"),
-                  "tools": tools, "instructions": ai_bridge._agent_instructions()},
-        "environment": {"type": "none"}, "input": prompt, "stream": True,
-    }
     session_id = ai_bridge._saved_session(vm)
     message = {"type": "agent.session.input.message", "input": [{"role": "user", "content": [
         {"type": "input_text", "text": prompt}]}]}
-    events = ai_bridge._stream(session_id, message) if session_id else ai_bridge._create_session(payload)
+    if session_id:
+        events = ai_bridge._stream(session_id, message)
+    else:
+        yield from vm.call(vm.tick("system_info"))
+        runtime_info = vm.pop()
+        capability_inventory = {
+            "direct_agent_tools": [
+                {"name": item["name"], "description": item["description"]}
+                for item in tools
+            ],
+            "live_forth_dictionary_words": sorted(vm.words.keys()),
+            "python_execution": {
+                "forth_words": [
+                    name for name in ("py:", "py::") if name in vm.words
+                ],
+                "cli_block": "<py> ... </py>",
+            },
+            "host": {
+                "os": runtime_info.get("os"),
+                "python": runtime_info.get("python"),
+                "venv": runtime_info.get("venv"),
+                "wsl": runtime_info.get("wsl"),
+                "shells": runtime_info.get("shells"),
+                "source_path": runtime_info.get("source_path"),
+            },
+        }
+        instructions = (
+            ai_bridge._agent_instructions()
+            + chr(10) * 2 + "## Runtime capability inventory" + chr(10)
+            + json.dumps(capability_inventory, ensure_ascii=False, indent=2)
+        )
+        if len(instructions.encode("utf-8")) > 100_000:
+            raise RuntimeError("Project K runtime capability instructions are too large.")
+        payload = {
+            "agent": {"model": os.environ.get("PROJECTK_AI_MODEL", "gpt-6-astra"),
+                      "tools": tools, "instructions": instructions},
+            "environment": {"type": "none"}, "input": prompt, "stream": True,
+        }
+        events = ai_bridge._create_session(payload)
     answer = []
     ai_started = False
     ai_line_start = True
