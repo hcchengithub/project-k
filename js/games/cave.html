@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CAVE-K — Cave Treasure Hunt</title>
+<style>
+:root{--bg:#f6efe8;--fg:#2b1d16;--panel:#fffaf5;--line:#d9c7b8;--acc:#c1440e;--rock:#6b4a3a;--gnd:#e2c9a8;--gold:#d49a00;--ok:#1b7a3a;--bad:#b3261e;--c:min(10vw,44px);
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17110e;--fg:#f0e4da;--panel:#241a15;--line:#4a392f;--acc:#ff8a4c;--rock:#4a342a;--gnd:#3b2c22;--gold:#ffc83d;--ok:#5fd68a;--bad:#ff7a70}}
+:root[data-theme="dark"]{--bg:#17110e;--fg:#f0e4da;--panel:#241a15;--line:#4a392f;--acc:#ff8a4c;--rock:#4a342a;--gnd:#3b2c22;--gold:#ffc83d;--ok:#5fd68a;--bad:#ff7a70}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,sans-serif}
+main{max-width:560px;margin:0 auto;padding:14px}
+h1{font-size:20px;margin:4px 0}.sub{margin:0 0 10px;opacity:.8;font-size:13px}
+code,textarea{font-family:ui-monospace,Menlo,Consolas,monospace}
+nav,.row,#chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+button{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:7px 11px;font:inherit;cursor:pointer}
+button.on,#go{background:var(--acc);color:#fff;border-color:var(--acc)}button:disabled{opacity:.45}
+#chips button{padding:4px 9px;font:13px ui-monospace,Menlo,monospace}
+#wrap{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
+#map{position:relative;display:inline-block;vertical-align:top}
+#tiles{display:grid}#tiles i{width:var(--c);height:var(--c);display:grid;place-items:center;font-style:normal;background:var(--gnd);color:var(--gold);font-size:calc(var(--c)*.6)}
+#tiles .r{background:var(--rock)}
+#rv{position:absolute;width:var(--c);height:var(--c);display:grid;place-items:center;transition:left .22s linear,top .22s linear}
+#rv i{width:72%;height:72%;display:grid;place-items:center;background:var(--acc);color:#fff;border-radius:50%;font-style:normal;font-size:calc(var(--c)*.5);border:2px solid #fff6}
+#rv.dead i{background:var(--bad)}#rv.pop i{animation:pop .3s}
+@keyframes pop{50%{transform:scale(1.35)}}
+#hud{display:flex;justify-content:space-between;gap:8px;font-size:13px;margin:8px 0 2px;flex-wrap:wrap}
+#msg{min-height:1.5em;margin:2px 0 6px;font-weight:600}#msg.ok{color:var(--ok)}#msg.bad{color:var(--bad)}
+textarea{width:100%;box-sizing:border-box;min-height:150px;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px;font-size:15px}
+details{margin-top:12px;font-size:13px}summary{cursor:pointer}footer{margin-top:14px;font-size:12px;opacity:.7}
+</style></head><body><main>
+<h1>🕯️ CAVE-K — Cave Treasure Hunt</h1>
+<p class="sub">Write a route in Forth and collect every coin before the torch goes out. Each step <code>pause</code>s for animation, then the Task <code>resume</code>s.</p>
+<nav id="lv"></nav>
+<div id="wrap"><div id="map"><div id="tiles"></div><div id="rv"><i>☺</i></div></div></div>
+<div id="hud"></div><div id="msg"></div>
+<div id="chips"></div>
+<textarea id="src" spellcheck="false" autocapitalize="off"></textarea>
+<div class="row"><button id="go">▶ Run</button><button id="stop" disabled>■ Stop</button><button id="copy">Copy program</button></div>
+<details><summary>How to play</summary>
+<p>Goal: walk over every coin ◆ to collect it. Each successful step uses one unit of torchlight; bumping a wall costs nothing. You fail when the torch runs out.</p>
+<p><code>n s e w</code> move one step north, south, east, or west. <code>n? s? e? w?</code> leave 1 on the stack if that direction is blocked by a wall, otherwise 0.</p>
+<p>Define new words with <code>: name … ;</code> (for example <code>: dash e e e ;</code>), repeat with <code>3 for … next</code>, branch with <code>… if … else … then</code>, and start comments with <code>\ </code>. The game grows these control words from the Project-K API. Fewer Forth words means a better score.</p>
+<p>This browser version is adapted from the terminal CAVE game; Level 2 keeps the original maze.</p></details>
+<footer>Powered by Project-K v2 (JavaScript)</footer>
+</main>
+<script type="module">
+import { VM, Literal, KernelError } from "https://cdn.jsdelivr.net/gh/hcchengithub/project-k@master/js/projectk.js";
+
+//<core>
+const LV=[
+{n:'1 Entrance',e:30,m:['#########','#@  #  $#','# # # ###','# #   $ #','#########'],s:'\\ Try defining your own word: : dash e e e ;\ne e\n'},
+{n:'2 Maze',e:60,m:['####################','#@   #     $#      #','# ## # ### ## #### #','# #    #      #    #','# # ##### #####  # #','#   #   $     #  # #','### # ####### # ## #','#   #       # #    #','# ####### # # #### #','#         #   #  $ #','####################'],s:'\\ Collect all 3 coins within 60 steps.\n'}];
+const DX={n:0,s:0,e:1,w:-1},DY={n:-1,s:1,e:0,w:0},S={},ui={draw(){}};
+const tile=(x,y)=>(S.g[y]||[])[x]||'#';
+function reset(i){const L=LV[i];Object.assign(S,{i,e:L.e,g:L.m.map(r=>[...r]),gold:0,over:null,msg:'',act:''});S.h=S.g.length;S.w=S.g[0].length;
+ S.g.forEach((r,y)=>r.forEach((c,x)=>{if(c==='@'){S.x=x;S.y=y;r[x]=' '}if(c==='$')S.gold++}));S.total=S.gold}
+function fail(m){S.over='fail';S.msg=m;ui.draw();throw new KernelError(m)}
+function makeVM(){const vm=new VM(),imm=(n,f)=>vm.define(n,f,{immediate:true}),cc=()=>vm._builder.colonCode,ts=()=>vm.tstack,
+ lit=()=>{const f=vm.frame;return f.colonCode[f.ip++].value};
+ vm.define(':',m=>{m.begin(m.input.read())});imm(';',m=>{m.finish()});imm('\\',m=>{m.input.read('\n')});
+ vm.define('(for)',m=>{m.rstack.push(m.pop())});
+ vm.define('(next)',m=>{const t=lit(),r=m.rstack;if(--r[r.length-1]>0)m.frame.ip=t;else r.pop()});
+ vm.define('(0br)',m=>{const t=lit();if(!m.pop())m.frame.ip=t});vm.define('(br)',m=>{m.frame.ip=lit()});
+ const open=m=>{if(!m.compiling){m.begin('(top)');ts().push('T')}},
+  close=function*(m){if(ts().length===1&&ts()[0]==='T'){ts().pop();yield*m.call(m.finish())}};
+ imm('for',m=>{open(m);m.comma('(for)');ts().push(cc().length)});
+ imm('next',function*(m){m.comma('(next)');m.literal(ts().pop());yield*close(m)});
+ imm('if',m=>{open(m);m.comma('(0br)');m.literal(0);ts().push(cc().length-1)});
+ imm('else',m=>{const i=ts().pop();m.comma('(br)');m.literal(0);ts().push(cc().length-1);cc()[i]=new Literal(cc().length)});
+ imm('then',function*(m){cc()[ts().pop()]=new Literal(cc().length);yield*close(m)});
+ vm.define('not',m=>{m.push(m.pop()?0:1)});
+ for(const n of 'nsew'){
+  vm.define(n+'?',m=>{m.push(tile(S.x+DX[n],S.y+DY[n])==='#'?1:0)});
+  vm.define(n,function*(m){if(S.over)m.abort();S.msg='';S.act='';const x=S.x+DX[n],y=S.y+DY[n],t=tile(x,y);
+   if(t==='#')S.msg='Wall';else{S.x=x;S.y=y;S.e--;
+    if(t==='$'){S.g[y][x]=' ';S.gold--;S.act='gold';S.msg='Coin collected!'}
+    if(!S.gold){S.over='win';S.msg='All coins collected!'}}
+   ui.draw();if(!S.over&&S.e<=0)fail('The torch went out. You are trapped in the dark.');yield m.pause();if(S.over==='win')m.abort()})}
+ return vm}
+async function exec(src,ms,stop){let t;try{t=makeVM().dictate(src+'\n');
+ while(t.status==='paused'){await new Promise(r=>setTimeout(r,ms));if(stop()){t.cancel();S.msg='Stopped';ui.draw();return}t.resume()}
+ if(!S.over)S.msg='Program ended with '+S.gold+' coin'+(S.gold===1?'':'s')+' still hidden'}catch(e){if(!(e instanceof KernelError))throw e;if(!S.over)S.msg=e.message}ui.draw()}
+//</core>
+const $=id=>document.getElementById(id),prog={};let cur=0,busy=false,stopReq=false,best={};
+try{best=JSON.parse(localStorage.getItem('ck-best')||'{}')}catch(e){}
+const size=s=>s.replace(/\\[^\n]*/g,'').split(/\s+/).filter(Boolean).length;
+ui.draw=()=>{document.documentElement.style.setProperty('--c',`min(${Math.floor(920/S.w)/10}vw,${S.w>12?30:44}px)`);
+ const map=$('map'),rv=$('rv'),T=$('tiles');map.style.width=`calc(var(--c)*${S.w})`;map.style.height=`calc(var(--c)*${S.h})`;
+ T.style.gridTemplateColumns=`repeat(${S.w},var(--c))`;
+ T.innerHTML=S.g.map(r=>r.map(c=>`<i class="${c==='#'?'r':''}">${c==='$'?'◆':''}</i>`).join('')).join('');
+ rv.style.left=`calc(var(--c)*${S.x})`;rv.style.top=`calc(var(--c)*${S.y})`;rv.classList.toggle('dead',S.over==='fail');
+ if(S.act==='gold'){rv.classList.remove('pop');void rv.offsetWidth;rv.classList.add('pop')}
+ const b=best[S.i],n=size($('src').value);
+ $('hud').innerHTML=`<span>🕯️ Torch ${S.e}/${LV[S.i].e}</span><span>◆ ${S.total-S.gold}/${S.total}</span><span>🏆 Best ${b?b+' words':'—'}</span>`;
+ const m=$('msg');m.textContent=S.msg+(S.over==='win'?` (${n} words)`:'');m.className=S.over==='win'?'ok':S.over==='fail'?'bad':'';
+ if(S.over==='win'&&!S.rec){S.rec=1;if(!b||n<b){best[S.i]=n;try{localStorage.setItem('ck-best',JSON.stringify(best))}catch(e){}}}};
+function load(i){prog[cur]=$('src').value;cur=i;reset(i);$('src').value=prog[i]??LV[i].s;
+ [...$('lv').children].forEach((b,j)=>b.classList.toggle('on',j===i));ui.draw()}
+LV.forEach((L,i)=>{const b=document.createElement('button');b.textContent=L.n;b.onclick=()=>!busy&&load(i);$('lv').append(b)});
+'n s e w n? s? e? w? : ; for next if else then not'.split(' ').forEach(w=>{const b=document.createElement('button');b.textContent=w;
+ b.onclick=()=>{const t=$('src');t.setRangeText(w+' ',t.selectionStart,t.selectionEnd,'end')};$('chips').append(b)});
+$('go').onclick=async()=>{if(busy)return;busy=true;stopReq=false;reset(cur);S.rec=0;ui.draw();
+ $('src').readOnly=true;$('go').disabled=true;$('stop').disabled=false;
+ await exec($('src').value,240,()=>stopReq);busy=false;$('src').readOnly=false;$('go').disabled=false;$('stop').disabled=true};
+$('stop').onclick=()=>{stopReq=true};
+$('copy').onclick=async()=>{const t=$('src');try{await navigator.clipboard.writeText(t.value)}catch(e){t.select();document.execCommand('copy')}
+ $('copy').textContent='Copied ✓';setTimeout(()=>$('copy').textContent='Copy program',1200)};
+load(0);
+</script></body></html>
