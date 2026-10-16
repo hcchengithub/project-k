@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project K JavaScript V2 Lab</title>
+<style>
+:root{color-scheme:light dark;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+body{margin:0;background:Canvas;color:CanvasText}
+main{max-width:980px;margin:auto;padding:24px}
+h1{margin-bottom:4px}.sub{opacity:.75;margin-top:0}
+.grid{display:grid;grid-template-columns:1.4fr 1fr;gap:16px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.panel{border:1px solid color-mix(in srgb,CanvasText 20%,transparent);border-radius:12px;padding:14px;background:color-mix(in srgb,Canvas 96%,CanvasText 4%)}
+textarea,pre,code,select{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+textarea{width:100%;box-sizing:border-box;min-height:220px;padding:12px;border-radius:8px;border:1px solid color-mix(in srgb,CanvasText 25%,transparent);font-size:14px}
+pre{white-space:pre-wrap;min-height:100px;max-height:300px;overflow:auto}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+button,select{padding:8px 11px;border-radius:8px;border:1px solid color-mix(in srgb,CanvasText 25%,transparent);background:Canvas;color:CanvasText}
+button{cursor:pointer}.primary{font-weight:700}
+dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 12px;margin:0}
+dt{font-weight:700}
+#words{max-height:180px;overflow:auto;word-break:break-word}
+small{opacity:.72}
+</style>
+</head>
+<body>
+<main>
+<h1>Project K JavaScript V2 Lab</h1>
+<p class="sub">An interactive companion to the README. The browser is the host; Project K is the kernel.</p>
+
+<div class="row">
+<select id="example">
+<option value="">Choose an experiment…</option>
+<option value="seed">1 · Bare kernel</option>
+<option value="grow">2 · Grow words</option>
+<option value="colon">3 · Colon definition</option>
+<option value="capture">4 · Captured binding</option>
+<option value="pause">5 · Pause / resume</option>
+<option value="input">6 · Context-sensitive input</option>
+<option value="browser">7 · Browser as host</option>
+</select>
+<button id="load">Load example</button>
+<button id="reset">Reset VM</button>
+<button id="clear">Clear output</button>
+</div>
+
+<div class="grid">
+<section class="panel">
+<h2>k&gt; input</h2>
+<textarea id="source" spellcheck="false">3 4 + .s</textarea>
+<div class="row">
+<button class="primary" id="run">Run</button>
+<button id="resume">Resume last paused task</button>
+</div>
+<small>Ctrl+Enter runs the current source. Multi-line <code>code ... end-code</code> definitions are supported.</small>
+</section>
+
+<section class="panel">
+<h2>State</h2>
+<dl>
+<dt>Task</dt><dd id="task">—</dd>
+<dt>Data stack</dt><dd><code id="stack">[]</code></dd>
+<dt>Latest</dt><dd><code id="latest">—</code></dd>
+<dt>Words</dt><dd id="words">—</dd>
+</dl>
+</section>
+</div>
+
+<section class="panel" style="margin-top:16px">
+<h2>Output</h2>
+<pre id="output"></pre>
+</section>
+
+<section class="panel" style="margin-top:16px">
+<h2>What is preloaded?</h2>
+<p>A new <code>VM()</code> has only <code>code</code> and <code>end-code</code>. This lab then grows a small teaching vocabulary using those seed words: <code>:</code>, <code>;</code>, stack words, arithmetic, printing, strings, inspection, and <code>pause</code>. Reset rebuilds that vocabulary from scratch.</p>
+</section>
+</main>
+
+<script type="module">
+import { VM, KernelError } from "./projectk.js";
+
+const $ = id => document.getElementById(id);
+let vm;
+let paused = [];
+let lastTask = null;
+
+function write(...parts) {
+  $("output").textContent += parts.join(" ") + "\n";
+}
+
+const EXPLORER = String.raw`
+code :
+  vm.begin(vm.input.read())
+end-code
+
+code immediate
+  vm.latest.immediate = true
+end-code
+immediate
+
+code ;
+  vm.finish()
+end-code
+immediate
+
+code pick
+  vm.push(vm.peek(vm.pop()))
+end-code
+
+code roll
+  vm.push(vm.pop(vm.pop()))
+end-code
+
+: dup 0 pick ;
+: over 1 pick ;
+: swap 1 roll ;
+
+code drop
+  vm.pop()
+end-code
+
+code +
+  const b = vm.pop(), a = vm.pop()
+  vm.push(a + b)
+end-code
+
+code *
+  const b = vm.pop(), a = vm.pop()
+  vm.push(a * b)
+end-code
+
+code .
+  out(String(vm.pop()))
+end-code
+
+code .s
+  out("[" + vm.dstack.map(v => typeof v === "string" ? JSON.stringify(v) : String(v)).join(", ") + "]")
+end-code
+
+code words
+  out([...vm.words.keys()].join(" "))
+end-code
+
+code see
+  const name = vm.input.read()
+  const word = vm.tick(name)
+  if (word === null) throw new KernelError("Unknown word: " + name)
+  out(String(word))
+  out(word.source || "(" + word.action.map(String).join(", ") + ")")
+end-code
+
+code s"
+  let text = vm.input.read('"')
+  if (text.startsWith(" ")) text = text.slice(1)
+  if (vm.compiling) vm.literal(text)
+  else vm.push(text)
+end-code
+immediate
+
+code pause
+  yield vm.pause()
+end-code
+`;
+
+function refresh(task = lastTask) {
+  $("stack").textContent = "[" + vm.dstack.map(v => typeof v === "string" ? JSON.stringify(v) : String(v)).join(", ") + "]";
+  $("latest").textContent = vm.latest ? vm.latest.name : "—";
+  $("words").textContent = [...vm.words.keys()].join(" ");
+  $("task").textContent = task ? task.status : "—";
+  $("resume").disabled = paused.length === 0;
+}
+
+function resetVM() {
+  paused.forEach(t => { try { t.cancel(); } catch {} });
+  paused = [];
+  lastTask = null;
+  vm = new VM({ out: write, KernelError });
+  vm.dictate(EXPLORER);
+  write("VM reset. Explorer vocabulary grown from code/end-code.");
+  refresh();
+}
+
+function runSource() {
+  try {
+    const task = vm.dictate($("source").value);
+    lastTask = task;
+    if (task.status === "paused") {
+      paused.push(task);
+      write("Paused. The Task retains its continuation.");
+    }
+  } catch (error) {
+    write(error.name + ": " + error.message);
+  }
+  refresh();
+}
+
+function resumeLast() {
+  const task = paused.pop();
+  if (!task) return;
+  try {
+    task.resume();
+    lastTask = task;
+    if (task.status === "paused") paused.push(task);
+  } catch (error) {
+    write(error.name + ": " + error.message);
+  }
+  refresh(task);
+}
+
+const examples = {
+seed: `words`,
+grow: `code double
+  vm.push(vm.pop() * 2)
+end-code
+21 double .s`,
+colon: `: square dup * ;
+12 square .s
+see square`,
+capture: `: square dup * ;
+: old-square 6 square ;
+code square
+  vm.push(99)
+end-code
+old-square square .s`,
+pause: `: journey 1 pause 2 ;
+journey`,
+input: `code text
+  const value = vm.input.read("|").trimStart()
+  if (vm.compiling) vm.literal(value)
+  else vm.push(value)
+end-code
+immediate
+: greeting text Hello from context-sensitive input!| ;
+greeting .`,
+browser: `code title
+  document.title = vm.pop()
+end-code
+s" Project K owns this browser tab" title`
+};
+
+$("run").onclick = runSource;
+$("resume").onclick = resumeLast;
+$("reset").onclick = resetVM;
+$("clear").onclick = () => $("output").textContent = "";
+$("load").onclick = () => {
+  const value = examples[$("example").value];
+  if (value) $("source").value = value;
+};
+$("source").addEventListener("keydown", e => {
+  if (e.key === "Enter" && e.ctrlKey) {
+    e.preventDefault();
+    runSource();
+  }
+});
+
+resetVM();
+</script>
+</body>
+</html>
