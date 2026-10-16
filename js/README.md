@@ -1,23 +1,98 @@
 # Project K — JavaScript V2
 
-A minimal Forth kernel with resumable tasks, ported from the [Python V2
-implementation](../py/README.md) and the language-independent
-[conceptual specification](../docs/project-k-conceptual-spec.md).
+A minimal Forth kernel with resumable tasks, implemented from the
+[language-independent conceptual specification](../docs/project-k-conceptual-spec.md)
+and developed alongside the [Python V2 implementation](../py/README.md).
 
 A fresh `VM` contains only two words, `code` and `end-code`. Everything else is
 grown from them. Tasks can `pause` while waiting for outside work and `resume`
 later. The kernel itself has no AI integration.
 
-Requires Node 18 or later. No dependencies.
+**Project K requires a JavaScript runtime, not Node.js specifically.**
+The kernel has no dependencies and imports nothing from Node, so the same
+`projectk.js` can run in Node.js or directly in a modern web browser as an
+ES module.
 
-## Quick start: Hello World from the bare kernel
+## Quick start: browser — no installation
+
+Because `projectk.js` is an ES module, load it with `type="module"`.
+
+This example imports Project K directly from this GitHub repository through
+jsDelivr, so the HTML file itself can be anywhere:
+
+```html
+<!doctype html>
+<html>
+<body>
+  <script type="module">
+    import { VM } from "https://cdn.jsdelivr.net/gh/hcchengithub/project-k@master/js/projectk.js";
+
+    const vm = new VM();
+
+    vm.dictate(`
+      code hi
+        console.log("hello from Project K");
+      end-code
+      hi
+    `);
+  </script>
+</body>
+</html>
+```
+
+No Node.js, npm, build step, or local copy of Project K is required.
+
+A browser is itself a JavaScript host, so host words can use browser facilities
+such as `document`, `fetch`, Canvas, WebSocket, Web Audio, and other Web APIs:
+
+```html
+<div id="output"></div>
+
+<script type="module">
+  import { VM } from "https://cdn.jsdelivr.net/gh/hcchengithub/project-k@master/js/projectk.js";
+
+  const vm = new VM();
+
+  vm.dictate(`
+    code show
+      document.getElementById("output").textContent = vm.pop();
+    end-code
+
+    code hello
+      vm.push("Hello from Forth inside a web page");
+    end-code
+
+    hello show
+  `);
+</script>
+```
+
+### Browser security note
+
+`code ... end-code` compiles JavaScript host bodies dynamically. A page with a
+strict Content Security Policy that forbids dynamic code generation
+(`unsafe-eval`) may therefore block host definitions. Ordinary pages without
+that restriction can use them normally.
+
+For browser use, prefer a JavaScript CDN such as jsDelivr rather than a
+`raw.githubusercontent.com` URL. GitHub Raw is primarily a file-download
+endpoint; a CDN provides more appropriate JavaScript delivery and caching.
+
+## Quick start: Node.js
+
+Node.js 18 or later is recommended for the supplied command-line demos and test
+suite.
 
 ```js
 import { VM } from "./projectk.js";
 
 const vm = new VM();
-vm.dictate("code hi console.log('hello World!') end-code");   // defines hi
-vm.dictate("hi");                                              // prints hello World!
+vm.dictate(`
+  code hi
+    console.log("hello World!");
+  end-code
+`);                    // defines hi
+vm.dictate("hi");       // prints hello World!
 ```
 
 The first `dictate()` defines a code word named `hi`; it does not run it. The
@@ -37,6 +112,9 @@ node demo.js        # open the k> console (try: : square dup * ; 12 square .)
 node --test         # run the tests
 node cave.js        # play CAVE
 ```
+
+These command-line examples require Node.js; **the Project K kernel itself does
+not**.
 
 ## Differences from the Python implementation
 
