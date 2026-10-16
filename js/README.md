@@ -67,9 +67,8 @@ The game **[Run Sokoban-K](https://raw.githack.com/hcchengithub/project-k/master
 teaching demo. It is an application built *with* Project K, not the Project K
 lab itself.
 
-> On github.com an HTML file is shown as source. To run these pages directly
-> from a GitHub-hosted URL, serve the repository with GitHub Pages (or another
-> static web server). The files themselves require no server-side code.
+On GitHub, the **source** links show the HTML files as code. The **Run** links
+above open the executable pages directly.
 
 ---
 
