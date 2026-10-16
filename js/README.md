@@ -61,11 +61,11 @@ There is no npm install, build step, or local copy of Project K in that example.
 The web page is the host.
 
 For learning, however, you do not need to keep building little HTML files.
-Open **[demo.html](demo.html)**. It is the interactive laboratory used
+Open **[Run demo](https://raw.githack.com/hcchengithub/project-k/master/js/demo.html)** ([source](demo.html)). It is the interactive laboratory used
 throughout this README: a Forth input area, output, data-stack display,
 vocabulary display, latest-definition display, and Task status.
 
-The game **[Sokoban-K](games/sokoban.html)** is deliberately separate from the
+The game **[Run Sokoban-K](https://raw.githack.com/hcchengithub/project-k/master/js/games/sokoban.html)** ([source](games/sokoban.html)) is deliberately separate from the
 teaching demo. It is an application built *with* Project K, not the Project K
 lab itself.
 
@@ -95,7 +95,7 @@ The separation is intentional:
 | File | Role |
 | --- | --- |
 | `projectk.js` | The kernel. |
-| `demo.html` | The browser REPL/lab that accompanies this README. |
+| [`demo.html`](https://raw.githack.com/hcchengithub/project-k/master/js/demo.html) | The browser REPL/lab that accompanies this README. |
 | `test.js` | Environment-neutral behavioral test cases. |
 | `test-runner-browser.html` | Runs those tests in a browser. |
 | `test-runner-node.js` | Runs the same tests under Node.js. |
@@ -134,7 +134,7 @@ Because usefulness is not the same thing as *kernel responsibility*. If a
 facility can be grown naturally from a smaller mechanism, eForth's lesson asks
 us to consider leaving it outside the seed.
 
-Try **“1 · Bare kernel”** in `demo.html`. The lab itself loads a small teaching
+Try **“1 · Bare kernel”** in [`demo.html`](https://raw.githack.com/hcchengithub/project-k/master/js/demo.html). The lab itself loads a small teaching
 vocabulary after creating the VM, but the experiment lets you inspect where the
 growth began.
 
@@ -180,7 +180,7 @@ larger vocabulary
 application
 ```
 
-Try **“2 · Grow words”** in `demo.html`.
+Try **“2 · Grow words”** in [`demo.html`](https://raw.githack.com/hcchengithub/project-k/master/js/demo.html).
 
 ---
 
@@ -260,7 +260,7 @@ redirect references already compiled into existing colon definitions.
 This is a subtle but important property of an evolving Forth system. A name can
 move forward without secretly changing old compiled behavior.
 
-Try **“4 · Captured binding”** in `demo.html`.
+Try **“4 · Captured binding”** in [`demo.html`](https://raw.githack.com/hcchengithub/project-k/master/js/demo.html).
 
 ---
 
@@ -372,7 +372,7 @@ That is why Project K does not reduce input to an array of tokens at the front
 door. General interpretation reads tokens, but extensions may consume source
 according to their own syntax.
 
-Try **“6 · Context-sensitive input”** in `demo.html`.
+Try **“6 · Context-sensitive input”** in [`demo.html`](https://raw.githack.com/hcchengithub/project-k/master/js/demo.html).
 
 This is one of the mechanisms by which a small kernel gives the *user of the
 language* some power to become a *designer of the language*.
@@ -626,7 +626,7 @@ and the stack becomes:
 [1, 2, 3]
 ```
 
-Try **“5 · Pause / resume”** in `demo.html`.
+Try **“5 · Pause / resume”** in [`demo.html`](https://raw.githack.com/hcchengithub/project-k/master/js/demo.html).
 
 This is Project K's modern addition to the minimalist Forth story: the kernel
 remains small, but an execution can retain its path while the host regains
@@ -762,7 +762,7 @@ Then:
 s" Project K owns this browser tab" title
 ```
 
-Try **“7 · Browser as host”** in `demo.html`.
+Try **“7 · Browser as host”** in [`demo.html`](https://raw.githack.com/hcchengithub/project-k/master/js/demo.html).
 
 Notice what the architecture does *not* require: DOM support inside the kernel.
 
@@ -794,7 +794,7 @@ strategy appropriate to that environment.
 
 This is where the abstract pieces should earn their keep.
 
-Open **[games/sokoban.html](games/sokoban.html)**.
+Open **[Run Sokoban-K](https://raw.githack.com/hcchengithub/project-k/master/js/games/sokoban.html)** ([source](games/sokoban.html)).
 
 Sokoban-K uses the same Project K kernel rather than embedding another copy of
 it. The page imports:
@@ -869,7 +869,7 @@ thin adapters:
 
 Open:
 
-**[test-runner-browser.html](test-runner-browser.html)**
+**[Run browser tests](https://raw.githack.com/hcchengithub/project-k/master/js/test-runner-browser.html)** ([source](test-runner-browser.html))
 
 It imports `test.js`, runs the cases, and renders pass/fail results into the
 page.
