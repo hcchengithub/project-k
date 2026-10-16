@@ -1,14 +1,14 @@
 <!doctype html>
-<html lang="zh-Hant"><head><meta charset="utf-8">
+<html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Sokoban-K：Forth 倉庫番</title>
+<title>Sokoban-K — Forth Sokoban</title>
 <style>
 :root{--bg:#f3ede4;--fg:#2a2118;--panel:#fffaf2;--line:#d6c7b4;--acc:#b5651d;--wall:#6d5a49;--flr:#e6d5b8;--box:#c98a3b;--ok:#2e8b4a;--bad:#b3261e;--c:min(10vw,44px);
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#18130e;--fg:#efe5d8;--panel:#241c15;--line:#4a3c2e;--acc:#e8963f;--wall:#4a3d31;--flr:#3a2f24;--box:#c98a3b;--ok:#5fd68a;--bad:#ff7a70}}
 :root[data-theme="dark"]{--bg:#18130e;--fg:#efe5d8;--panel:#241c15;--line:#4a3c2e;--acc:#e8963f;--wall:#4a3d31;--flr:#3a2f24;--box:#c98a3b;--ok:#5fd68a;--bad:#ff7a70}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
-body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Noto Sans TC",sans-serif}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,sans-serif}
 main{max-width:560px;margin:0 auto;padding:14px}h1{font-size:20px;margin:4px 0}.sub{margin:0 0 10px;opacity:.8;font-size:13px}
 code,textarea,#stk{font-family:ui-monospace,Menlo,Consolas,monospace}
 nav,.row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
@@ -24,20 +24,20 @@ button.on,#go{background:var(--acc);color:#fff;border-color:var(--acc)}button:di
 textarea{width:100%;box-sizing:border-box;min-height:84px;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px;font-size:15px}
 details{margin-top:12px;font-size:13px}summary{cursor:pointer}footer{margin-top:14px;font-size:12px;opacity:.7}
 </style></head><body><main>
-<h1>📦 Sokoban-K：Forth 倉庫番</h1>
-<p class="sub">每一步都推進 Forth 堆疊，所以 <code>undo</code> 可以無限復原；成功的路徑能存成一個詞彙，一鍵重播。</p>
+<h1>📦 Sokoban-K — Forth Sokoban</h1>
+<p class="sub">Every move is recorded on the Forth stack, so <code>undo</code> can rewind without limit. A successful route can be saved as a new word and replayed.</p>
 <nav id="lv"></nav>
 <div id="wrap"><div id="tiles"></div></div>
 <div id="hud"></div><div id="stk"></div><div id="msg"></div>
-<div class="row" id="pad"><button data-w="l">←</button><button data-w="u">↑</button><button data-w="d">↓</button><button data-w="r">→</button><button data-w="undo">↶ 復原</button><button id="rs">⟲ 重來</button></div>
+<div class="row" id="pad"><button data-w="l">←</button><button data-w="u">↑</button><button data-w="d">↓</button><button data-w="r">→</button><button data-w="undo">↶ Undo</button><button id="rs">⟲ Restart</button></div>
 <textarea id="src" spellcheck="false" autocapitalize="off" placeholder=": solve-1 u u r r d l d ;&#10;solve-1"></textarea>
-<div class="row"><button id="go">▶ 執行</button><button id="stop" disabled>■ 停止</button><button id="sv">💾 把目前路徑存成詞彙</button></div>
+<div class="row"><button id="go">▶ Run</button><button id="stop" disabled>■ Stop</button><button id="sv">💾 Save route as a word</button></div>
 <div class="row" id="my"></div>
-<details><summary>怎麼玩</summary>
-<p>把所有箱子 ▣ 推到目標 ◎ 上。方向鍵／WASD 移動，Z 復原，也可以用按鈕。<code>u d l r</code> 是移動詞，<code>undo</code> 復原一步。</p>
-<p>堆疊每個字母是一步：小寫是單純移動，大寫是推了箱子。「存成詞彙」會把堆疊裡的路徑變成 <code>: solve-N … ;</code>，之後按它的按鈕就會從頭自動重播。</p>
-<p>輸入框可以寫任何 Forth：<code>3 for r next</code> 重複、<code>: 名字 … ;</code> 定義新詞，<code>\ </code> 開頭是註解。</p></details>
-<footer>Powered by Project K V2 (JavaScript)</footer>
+<details><summary>How to play</summary>
+<p>Push every box ▣ onto a goal ◎. Use the arrow keys or WASD to move, Z to undo, or use the buttons. <code>u d l r</code> are movement words; <code>undo</code> rewinds one move.</p>
+<p>Each stack letter records one move: lowercase means walking, uppercase means pushing a box. “Save route as a word” turns the stack into <code>: solve-N … ;</code>; its button then replays the route from the beginning.</p>
+<p>The input accepts Forth: <code>3 for r next</code> repeats, <code>: name … ;</code> defines a word, and <code>\ </code> starts a comment.</p></details>
+<footer>Powered by Project-K v2 (JavaScript)</footer>
 </main>
 <script type="module">
 import { VM, Literal, KernelError } from "https://cdn.jsdelivr.net/gh/hcchengithub/project-k@master/js/projectk.js";
@@ -53,11 +53,11 @@ function reset(i){const L=LV[i],f=(c,s)=>s.includes(c);Object.assign(S,{i,wall:n
  const q=[K(S.x,S.y)];S.in.add(q[0]);while(q.length){const k=q.pop();for(let d=0;d<4;d++){const n=k+DY[d]*100+DX[d];if(!S.wall.has(n)&&!S.in.has(n)){S.in.add(n);q.push(n)}}}
  S.w=Math.max(...L.map(r=>r.length));S.h=L.length}
 function mv(m,d){if(S.won)return;const x=S.x+DX[d],y=S.y+DY[d],k=K(x,y);let p=0;
- if(S.wall.has(k)){S.msg='撞牆';return}
- if(S.box.has(k)){const k2=K(x+DX[d],y+DY[d]);if(S.wall.has(k2)||S.box.has(k2)){S.msg='推不動';return}S.box.delete(k);S.box.add(k2);p=1}
- S.x=x;S.y=y;S.msg='';S.mv++;m.push(d+4*p);if([...S.box].every(b=>S.goal.has(b))){S.won=true;S.msg='過關！'}}
-function undo(m){if(!m.dstack.length){S.msg='沒有可復原的步驟';return}const c=m.pop(),d=c&3;
- if(c>3){S.box.delete(K(S.x+DX[d],S.y+DY[d]));S.box.add(K(S.x,S.y))}S.x-=DX[d];S.y-=DY[d];S.won=false;S.mv--;S.msg='復原一步'}
+ if(S.wall.has(k)){S.msg='Wall';return}
+ if(S.box.has(k)){const k2=K(x+DX[d],y+DY[d]);if(S.wall.has(k2)||S.box.has(k2)){S.msg='Box cannot move';return}S.box.delete(k);S.box.add(k2);p=1}
+ S.x=x;S.y=y;S.msg='';S.mv++;m.push(d+4*p);if([...S.box].every(b=>S.goal.has(b))){S.won=true;S.msg='Solved!'}}
+function undo(m){if(!m.dstack.length){S.msg='Nothing to undo';return}const c=m.pop(),d=c&3;
+ if(c>3){S.box.delete(K(S.x+DX[d],S.y+DY[d]));S.box.add(K(S.x,S.y))}S.x-=DX[d];S.y-=DY[d];S.won=false;S.mv--;S.msg='Undid one move'}
 const seqOf=vm=>vm.dstack.filter(c=>c>=0&&c<8).map(c=>'urdl'[c&3]).join(' ');
 function makeVM(){const vm=new VM(),imm=(n,f)=>vm.define(n,f,{immediate:true}),cc=()=>vm._builder.colonCode,ts=()=>vm.tstack,
  lit=()=>{const f=vm.frame;return f.colonCode[f.ip++].value};
@@ -76,7 +76,7 @@ function makeVM(){const vm=new VM(),imm=(n,f)=>vm.define(n,f,{immediate:true}),c
  const act=(n,f)=>vm.define(n,function*(m){f(m);ui.draw();yield m.pause()});
  'urdl'.split('').forEach((n,d)=>act(n,m=>mv(m,d)));act('undo',undo);return vm}
 async function exec(vm,src,ms,stop){if(vm.compiling)vm._discard();let t;try{t=vm.dictate(src+'\n');
- while(t.status==='paused'){if(ms)await new Promise(r=>setTimeout(r,ms));if(stop()){t.cancel();S.msg='已停止';break}t.resume()}}
+ while(t.status==='paused'){if(ms)await new Promise(r=>setTimeout(r,ms));if(stop()){t.cancel();S.msg='Stopped';break}t.resume()}}
  catch(e){if(!(e instanceof KernelError))throw e;S.msg=e.message}ui.draw()}
 //</core>
 const $=id=>document.getElementById(id);let vm=makeVM(),cur=0,busy=false,stopReq=false,best={},saved={},done={};
@@ -87,21 +87,21 @@ ui.draw=()=>{$('tiles').style.gridTemplateColumns=`repeat(${S.w},var(--c))`;let 
  for(let y=0;y<S.h;y++)for(let x=0;x<S.w;x++){const k=K(x,y),g=S.goal.has(k),b=S.box.has(k);
   h+=S.wall.has(k)?'<i class="w"></i>':!S.in.has(k)?'<i class="v"></i>':`<i class="${b?(g?'k':'b'):g?'g':''}">${x===S.x&&y===S.y?'☺':b?'▣':g?'◎':''}</i>`}
  $('tiles').innerHTML=h;const s=vm.dstack.map(c=>'urdl'[c&3][c>3?'toUpperCase':'toString']()),n=LV.length;
- $('stk').textContent='堆疊 ［'+(s.length>16?'… ':'')+s.slice(-16).join(' ')+' ］ 深度 '+s.length;
- $('hud').innerHTML=`<span>步數 ${S.mv}</span><span>🏆 最佳 ${best[S.i]?best[S.i]+' 步':'—'}</span>`;
+ $('stk').textContent='Stack ['+(s.length>16?'… ':'')+s.slice(-16).join(' ')+'] depth '+s.length;
+ $('hud').innerHTML=`<span>Moves ${S.mv}</span><span>🏆 Best ${best[S.i]?best[S.i]+' moves':'—'}</span>`;
  const m=$('msg');m.textContent=S.msg;m.className=S.won?'ok':'';
  if(S.won&&!S.rec){S.rec=true;done[S.i]=1;if(!best[S.i]||S.mv<best[S.i])best[S.i]=S.mv;store();lvBtns()}
  $('my').innerHTML='';for(const w of saved[cur]||[]){const b=document.createElement('button');b.textContent='▶ '+w.n;b.onclick=()=>replay(w.n);$('my').append(b)}};
-function lvBtns(){$('lv').innerHTML='';LV.forEach((_,i)=>{const b=document.createElement('button');b.textContent='第 '+(i+1)+' 關'+(done[i]?' ✓':'');b.className=i===cur?'on':'';b.onclick=()=>!busy&&load(i);$('lv').append(b)})}
+function lvBtns(){$('lv').innerHTML='';LV.forEach((_,i)=>{const b=document.createElement('button');b.textContent='Level '+(i+1)+(done[i]?' ✓':'');b.className=i===cur?'on':'';b.onclick=()=>!busy&&load(i);$('lv').append(b)})}
 function load(i){cur=i;reset(i);vm.dstack.length=0;lvBtns();ui.draw()}
 async function run(src,ms){if(busy)return;busy=true;stopReq=false;$('stop').disabled=false;await exec(vm,src,ms,()=>stopReq);busy=false;$('stop').disabled=true}
 async function replay(n){if(busy)return;reset(cur);vm.dstack.length=0;ui.draw();await run(n,170)}
 document.querySelectorAll('#pad [data-w]').forEach(b=>b.onclick=()=>run(b.dataset.w,0));
 $('rs').onclick=()=>!busy&&load(cur);$('go').onclick=()=>run($('src').value,170);$('stop').onclick=()=>{stopReq=true};
-$('sv').onclick=()=>{const q=seqOf(vm);if(!q){S.msg='堆疊是空的，先走幾步再存';return ui.draw()}
+$('sv').onclick=()=>{const q=seqOf(vm);if(!q){S.msg='The stack is empty. Make a few moves first.';return ui.draw()}
  const l=saved[cur]=saved[cur]||[],n='solve-'+(cur+1)+(l.length?'-'+(l.length+1):'');
  try{vm.dictate(': '+n+' '+q+' ;')}catch(e){S.msg=e.message;return ui.draw()}
- l.push({n,q});store();S.msg=`已存成詞彙 ${n}（${q.split(' ').length} 步），按下方按鈕重播`;ui.draw()};
+ l.push({n,q});store();S.msg=`Saved as ${n} (${q.split(' ').length} moves). Use the button below to replay it.`;ui.draw()};
 document.addEventListener('keydown',e=>{if(e.target.tagName==='TEXTAREA'||e.ctrlKey||e.metaKey)return;
  const w={ArrowUp:'u',w:'u',ArrowDown:'d',s:'d',ArrowLeft:'l',a:'l',ArrowRight:'r',d:'r',z:'undo'}[e.key];if(w){e.preventDefault();run(w,0)}});
 load(0);
