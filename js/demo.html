@@ -6,75 +6,70 @@
 <title>Project K JavaScript V2 Lab</title>
 <style>
 :root{color-scheme:light dark;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+*{box-sizing:border-box}
 body{margin:0;background:Canvas;color:CanvasText}
-main{max-width:980px;margin:auto;padding:24px}
-h1{margin-bottom:4px}.sub{opacity:.75;margin-top:0}
-.grid{display:grid;grid-template-columns:1.4fr 1fr;gap:16px}
-@media(max-width:760px){.grid{grid-template-columns:1fr}}
-.panel{border:1px solid color-mix(in srgb,CanvasText 20%,transparent);border-radius:12px;padding:14px;background:color-mix(in srgb,Canvas 96%,CanvasText 4%)}
-textarea,pre,code,select{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
-textarea{width:100%;box-sizing:border-box;min-height:220px;padding:12px;border-radius:8px;border:1px solid color-mix(in srgb,CanvasText 25%,transparent);font-size:14px}
-pre{white-space:pre-wrap;min-height:100px;max-height:300px;overflow:auto}
-.row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
-button,select{padding:8px 11px;border-radius:8px;border:1px solid color-mix(in srgb,CanvasText 25%,transparent);background:Canvas;color:CanvasText}
+main{max-width:920px;height:100vh;margin:auto;padding:18px;display:flex;flex-direction:column;gap:10px}
+header{flex:none}
+h1{font-size:22px;margin:0 0 3px}.sub{opacity:.72;margin:0;font-size:13px}
+.terminal{min-height:0;flex:1;display:flex;flex-direction:column;border:1px solid color-mix(in srgb,CanvasText 22%,transparent);border-radius:10px;overflow:hidden;background:color-mix(in srgb,Canvas 97%,CanvasText 3%)}
+#output{flex:1;min-height:180px;margin:0;padding:14px;overflow-y:auto;white-space:pre-wrap;font:14px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace}
+.status{flex:none;border-top:1px solid color-mix(in srgb,CanvasText 16%,transparent);padding:7px 12px;display:flex;gap:14px;flex-wrap:wrap;font:12px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.82}
+.status b{font-weight:650}
+.input-area{flex:none}
+.prompt{display:flex;align-items:flex-start;gap:8px}
+.prompt-label{font:700 15px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;padding-top:9px}
+textarea{flex:1;width:100%;min-height:86px;max-height:180px;resize:vertical;padding:9px 10px;border-radius:8px;border:1px solid color-mix(in srgb,CanvasText 25%,transparent);font:14px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;background:Canvas;color:CanvasText}
+.controls{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:7px;padding-left:30px}
+button,select{padding:7px 10px;border-radius:7px;border:1px solid color-mix(in srgb,CanvasText 25%,transparent);background:Canvas;color:CanvasText;font:13px system-ui,sans-serif}
 button{cursor:pointer}.primary{font-weight:700}
-dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 12px;margin:0}
-dt{font-weight:700}
-#words{max-height:180px;overflow:auto;word-break:break-word}
-small{opacity:.72}
+select{max-width:260px}
+.hint{font-size:12px;opacity:.68;margin-left:auto}
+@media(max-width:650px){
+  main{padding:10px}
+  .hint{width:100%;margin-left:0}
+  .controls{padding-left:0}
+}
 </style>
 </head>
 <body>
 <main>
-<h1>Project K JavaScript V2 Lab</h1>
-<p class="sub">An interactive companion to the README. The browser is the host; Project K is the kernel.</p>
+<header>
+  <h1>Project K JavaScript V2 Lab</h1>
+  <p class="sub">Browser REPL · the browser is the host, Project K is the kernel.</p>
+</header>
 
-<div class="row">
-<select id="example">
-<option value="">Choose an experiment…</option>
-<option value="seed">1 · Bare kernel</option>
-<option value="grow">2 · Grow words</option>
-<option value="colon">3 · Colon definition</option>
-<option value="capture">4 · Captured binding</option>
-<option value="pause">5 · Pause / resume</option>
-<option value="input">6 · Context-sensitive input</option>
-<option value="browser">7 · Browser as host</option>
-</select>
-<button id="load">Load example</button>
-<button id="reset">Reset VM</button>
-<button id="clear">Clear output</button>
-</div>
-
-<div class="grid">
-<section class="panel">
-<h2>k&gt; input</h2>
-<textarea id="source" spellcheck="false">3 4 + .s</textarea>
-<div class="row">
-<button class="primary" id="run">Run</button>
-<button id="resume">Resume last paused task</button>
-</div>
-<small>Ctrl+Enter runs the current source. Multi-line <code>code ... end-code</code> definitions are supported.</small>
+<section class="terminal" aria-label="REPL transcript">
+  <pre id="output"></pre>
+  <div class="status">
+    <span>task: <b id="task">—</b></span>
+    <span>stack: <b id="stack">[]</b></span>
+    <span>latest: <b id="latest">—</b></span>
+    <span>words: <b id="wordCount">0</b></span>
+  </div>
 </section>
 
-<section class="panel">
-<h2>State</h2>
-<dl>
-<dt>Task</dt><dd id="task">—</dd>
-<dt>Data stack</dt><dd><code id="stack">[]</code></dd>
-<dt>Latest</dt><dd><code id="latest">—</code></dd>
-<dt>Words</dt><dd id="words">—</dd>
-</dl>
-</section>
-</div>
-
-<section class="panel" style="margin-top:16px">
-<h2>Output</h2>
-<pre id="output"></pre>
-</section>
-
-<section class="panel" style="margin-top:16px">
-<h2>What is preloaded?</h2>
-<p>A new <code>VM()</code> has only <code>code</code> and <code>end-code</code>. This lab then grows a small teaching vocabulary using those seed words: <code>:</code>, <code>;</code>, stack words, arithmetic, printing, strings, inspection, and <code>pause</code>. Reset rebuilds that vocabulary from scratch.</p>
+<section class="input-area">
+  <div class="prompt">
+    <div class="prompt-label">k&gt;</div>
+    <textarea id="source" spellcheck="false" autofocus>3 4 + .s</textarea>
+  </div>
+  <div class="controls">
+    <button class="primary" id="run">Run</button>
+    <button id="resume">Resume paused task</button>
+    <select id="example" title="Insert a README example into the input area">
+      <option value="">Insert README example…</option>
+      <option value="seed">Bare kernel / words</option>
+      <option value="grow">Grow a host word</option>
+      <option value="colon">Colon definition</option>
+      <option value="capture">Captured binding</option>
+      <option value="pause">Pause / resume</option>
+      <option value="input">Context-sensitive input</option>
+      <option value="browser">Browser as host</option>
+    </select>
+    <button id="reset">Reset VM</button>
+    <button id="clear">Clear transcript</button>
+    <span class="hint">Ctrl+Enter runs · examples are inserted, not auto-run</span>
+  </div>
 </section>
 </main>
 
@@ -86,8 +81,21 @@ let vm;
 let paused = [];
 let lastTask = null;
 
+function scrollBottom() {
+  const out = $("output");
+  out.scrollTop = out.scrollHeight;
+}
+
 function write(...parts) {
   $("output").textContent += parts.join(" ") + "\n";
+  scrollBottom();
+}
+
+function echoSource(source) {
+  const lines = source.replace(/\s+$/, "").split("\n");
+  if (!lines.length || (lines.length === 1 && !lines[0])) return;
+  write("k> " + lines[0]);
+  for (const line of lines.slice(1)) write(".. " + line);
 }
 
 const EXPLORER = String.raw`
@@ -167,7 +175,7 @@ end-code
 function refresh(task = lastTask) {
   $("stack").textContent = "[" + vm.dstack.map(v => typeof v === "string" ? JSON.stringify(v) : String(v)).join(", ") + "]";
   $("latest").textContent = vm.latest ? vm.latest.name : "—";
-  $("words").textContent = [...vm.words.keys()].join(" ");
+  $("wordCount").textContent = String(vm.words.size);
   $("task").textContent = task ? task.status : "—";
   $("resume").disabled = paused.length === 0;
 }
@@ -178,31 +186,41 @@ function resetVM() {
   lastTask = null;
   vm = new VM({ out: write, KernelError });
   vm.dictate(EXPLORER);
-  write("VM reset. Explorer vocabulary grown from code/end-code.");
+  write("Project K ready.");
+  write("Teaching vocabulary grown from the two seed words: code end-code");
+  write("Type Forth below. Try: 12 3 + .s");
   refresh();
 }
 
 function runSource() {
+  const source = $("source").value;
+  if (!source.trim()) return;
+  echoSource(source);
   try {
-    const task = vm.dictate($("source").value);
+    const task = vm.dictate(source);
     lastTask = task;
     if (task.status === "paused") {
       paused.push(task);
-      write("Paused. The Task retains its continuation.");
+      write("[paused] use Resume paused task to continue");
     }
   } catch (error) {
     write(error.name + ": " + error.message);
   }
   refresh();
+  $("source").select();
 }
 
 function resumeLast() {
   const task = paused.pop();
   if (!task) return;
+  write("k> [resume]");
   try {
     task.resume();
     lastTask = task;
-    if (task.status === "paused") paused.push(task);
+    if (task.status === "paused") {
+      paused.push(task);
+      write("[paused again]");
+    }
   } catch (error) {
     write(error.name + ": " + error.message);
   }
@@ -243,10 +261,18 @@ s" Project K owns this browser tab" title`
 $("run").onclick = runSource;
 $("resume").onclick = resumeLast;
 $("reset").onclick = resetVM;
-$("clear").onclick = () => $("output").textContent = "";
-$("load").onclick = () => {
-  const value = examples[$("example").value];
-  if (value) $("source").value = value;
+$("clear").onclick = () => {
+  $("output").textContent = "";
+  write("Transcript cleared.");
+};
+$("example").onchange = event => {
+  const value = examples[event.target.value];
+  if (value) {
+    $("source").value = value;
+    $("source").focus();
+    $("source").select();
+  }
+  event.target.value = "";
 };
 $("source").addEventListener("keydown", e => {
   if (e.key === "Enter" && e.ctrlKey) {
@@ -256,6 +282,7 @@ $("source").addEventListener("keydown", e => {
 });
 
 resetVM();
+$("source").focus();
 </script>
 </body>
 </html>
