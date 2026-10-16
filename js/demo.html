@@ -207,7 +207,8 @@ function runSource() {
     write(error.name + ": " + error.message);
   }
   refresh();
-  $("source").select();
+  $("source").value = "";
+  $("source").focus();
 }
 
 function resumeLast() {
