@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rover-K — Mars Rover</title>
+<style>
+:root{--bg:#f6efe8;--fg:#2b1d16;--panel:#fffaf5;--line:#d9c7b8;--acc:#c1440e;--rock:#6b4a3a;--sand:#e8c98f;--gnd:#d98c5f;--cry:#18a8b8;--ok:#1b7a3a;--bad:#b3261e;--c:min(10.5vw,42px);
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17110e;--fg:#f0e4da;--panel:#241a15;--line:#4a392f;--acc:#ff8a4c;--rock:#4a342a;--sand:#8a7040;--gnd:#8a4a2c;--cry:#4fd8e8;--ok:#5fd68a;--bad:#ff7a70}}
+:root[data-theme="dark"]{--bg:#17110e;--fg:#f0e4da;--panel:#241a15;--line:#4a392f;--acc:#ff8a4c;--rock:#4a342a;--sand:#8a7040;--gnd:#8a4a2c;--cry:#4fd8e8;--ok:#5fd68a;--bad:#ff7a70}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,sans-serif}
+main{max-width:560px;margin:0 auto;padding:14px}
+h1{font-size:20px;margin:4px 0}.sub{margin:0 0 10px;opacity:.8;font-size:13px}
+code,textarea{font-family:ui-monospace,Menlo,Consolas,monospace}
+nav,.row,#chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+button{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:7px 11px;font:inherit;cursor:pointer}
+button.on,#go{background:var(--acc);color:#fff;border-color:var(--acc)}button:disabled{opacity:.45}
+#chips button{padding:4px 9px;font:13px ui-monospace,Menlo,monospace}
+#wrap{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
+#map{position:relative;display:inline-block;vertical-align:top}
+#tiles{display:grid}#tiles i{width:var(--c);height:var(--c);display:grid;place-items:center;font-style:normal;background:var(--gnd);font-size:calc(var(--c)*.5)}
+#tiles .r{background:var(--rock)}#tiles .s{background:var(--sand)}#tiles .o{background:#2a1a14;border-radius:50%;transform:scale(.8)}#tiles .x{color:var(--cry)}
+#rv{position:absolute;width:var(--c);height:var(--c);display:grid;place-items:center;transition:left .3s linear,top .3s linear,transform .3s linear}
+#rv i{width:70%;height:70%;display:grid;place-items:center;background:var(--acc);color:#fff;border-radius:6px;font-style:normal;font-size:calc(var(--c)*.45);border:2px solid #fff6}
+#rv.dr i{animation:dr .35s}#rv.dead i{background:var(--bad)}
+@keyframes dr{0%,100%{transform:scale(1)}25%{transform:scale(.8) rotate(-12deg)}50%{transform:scale(.8) rotate(12deg)}75%{transform:scale(.8) rotate(-12deg)}}
+#hud{display:flex;justify-content:space-between;gap:8px;font-size:13px;margin:8px 0 2px;flex-wrap:wrap}
+#msg{min-height:1.5em;margin:2px 0 6px;font-weight:600}#msg.ok{color:var(--ok)}#msg.bad{color:var(--bad)}
+textarea{width:100%;box-sizing:border-box;min-height:150px;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px;font-size:15px}
+details{margin-top:12px;font-size:13px}summary{cursor:pointer}footer{margin-top:14px;font-size:12px;opacity:.7}
+</style></head><body><main>
+<h1>🔴 Rover-K — Mars Rover</h1>
+<p class="sub">Program a Mars rover in Forth. Every action <code>pause</code>s so the animation can finish before the Task <code>resume</code>s.</p>
+<nav id="lv"></nav>
+<div id="wrap"><div id="map"><div id="tiles"></div><div id="rv"><i>▲</i></div></div></div>
+<div id="hud"></div><div id="msg"></div>
+<div id="chips"></div>
+<textarea id="src" spellcheck="false" autocapitalize="off"></textarea>
+<div class="row"><button id="go">▶ Run</button><button id="stop" disabled>■ Stop</button><button id="copy">Copy program</button></div>
+<details><summary>How to play</summary>
+<p>Goal: collect every crystal ◆, return to base ⌂, then <code>transmit</code>. Quicksand ≈, craters ●, or running out of power will end the mission.</p>
+<p><code>forward</code> moves ahead, <code>left</code>/<code>right</code> turn, <code>drill</code> collects a crystal, and <code>scan</code> leaves 1 on the stack when danger is ahead, otherwise 0.</p>
+<p>Define new words with <code>: name … ;</code>, repeat with <code>3 for … next</code>, branch with <code>… if … else … then</code>, and start comments with <code>\ </code>. These control words are grown by the game from the Project-K API; they are not kernel primitives. Fewer Forth words means a better score.</p>
+<p>Forth was originally created for controlling astronomical equipment—a fitting ancestor for a tiny programmable rover.</p></details>
+<footer>Powered by Project-K v2 (JavaScript)</footer>
+</main>
+<script type="module">
+import { VM, Literal, KernelError } from "https://cdn.jsdelivr.net/gh/hcchengithub/project-k@master/js/projectk.js";
+
+//<core>
+const LV=[
+{n:'1 Landing',e:30,m:['#########','#R.*.*..#','#########'],s:'\\ Move forward, drill, then return to base and transmit.\nforward forward drill\n'},
+{n:'2 Quicksand',e:40,m:['#########','#R......#','#.~~~~o.#','#.*...*.#','#.......#','#########'],s:'\\ Turn right toward the south first. Avoid ≈ and ●.\n'},
+{n:'3 Circuit',e:36,m:['#######','#R.*..#','#.#o#.#','#.*.*.#','#######'],s:'\\ Try for … next and define your own word.\n: dig drill ;\n'}];
+const DX=[0,1,0,-1],DY=[-1,0,1,0],S={},ui={draw(){}};
+const tile=(x,y)=>(S.g[y]||[])[x]||'#';
+function reset(i){const L=LV[i];Object.assign(S,{i,e:L.e,g:L.m.map(r=>[...r]),cr:0,over:null,rot:90,d:1,msg:''});
+ S.h=S.g.length;S.w=S.g[0].length;S.g.forEach((r,y)=>r.forEach((c,x)=>{if(c==='R'){S.x=S.bx=x;S.y=S.by=y;r[x]='.'}if(c==='*')S.cr++}));S.total=S.cr}
+function fail(m){S.over='fail';S.msg=m;ui.draw();throw new KernelError(m)}
+function makeVM(){const vm=new VM(),imm=(n,f)=>vm.define(n,f,{immediate:true}),cc=()=>vm._builder.colonCode,ts=()=>vm.tstack,
+ lit=()=>{const f=vm.frame;return f.colonCode[f.ip++].value};
+ vm.define(':',m=>{m.begin(m.input.read())});imm(';',m=>{m.finish()});imm('\\',m=>{m.input.read('\n')});
+ vm.define('(for)',m=>{m.rstack.push(m.pop())});
+ vm.define('(next)',m=>{const t=lit(),r=m.rstack;if(--r[r.length-1]>0)m.frame.ip=t;else r.pop()});
+ vm.define('(0br)',m=>{const t=lit();if(!m.pop())m.frame.ip=t});vm.define('(br)',m=>{m.frame.ip=lit()});
+ const open=m=>{if(!m.compiling){m.begin('(top)');ts().push('T')}},
+  close=function*(m){if(ts().length===1&&ts()[0]==='T'){ts().pop();yield*m.call(m.finish())}};
+ imm('for',m=>{open(m);m.comma('(for)');ts().push(cc().length)});
+ imm('next',function*(m){m.comma('(next)');m.literal(ts().pop());yield*close(m)});
+ imm('if',m=>{open(m);m.comma('(0br)');m.literal(0);ts().push(cc().length-1)});
+ imm('else',m=>{const i=ts().pop();m.comma('(br)');m.literal(0);ts().push(cc().length-1);cc()[i]=new Literal(cc().length)});
+ imm('then',function*(m){cc()[ts().pop()]=new Literal(cc().length);yield*close(m)});
+ vm.define('not',m=>{m.push(m.pop()?0:1)});
+ const act=(n,f)=>vm.define(n,function*(m){if(S.over)m.abort();S.msg='';S.act=n;f(m);S.e--;ui.draw(n);
+  if(!S.over&&S.e<=0)fail('Power depleted');yield m.pause();if(S.over==='win')m.abort()});
+ act('forward',()=>{const x=S.x+DX[S.d],y=S.y+DY[S.d],t=tile(x,y);if(t==='#'){S.msg='Rock ahead';return}
+  S.x=x;S.y=y;if(t==='~')fail('Rover trapped in quicksand!');if(t==='o')fail('Rover fell into a crater!')});
+ act('left',()=>{S.d=(S.d+3)%4;S.rot-=90});act('right',()=>{S.d=(S.d+1)%4;S.rot+=90});
+ act('scan',m=>{m.push('~o#'.includes(tile(S.x+DX[S.d],S.y+DY[S.d]))?1:0)});
+ act('drill',()=>{if(S.g[S.y][S.x]==='*'){S.g[S.y][S.x]='.';S.cr--;S.msg='Crystal collected!'}else S.msg='No crystal here'});
+ act('transmit',()=>{if(S.x!==S.bx||S.y!==S.by)S.msg='Return to base ⌂ before transmitting';
+  else if(S.cr)S.msg=S.cr+' crystal'+(S.cr===1?'':'s')+' still to collect';else{S.over='win';S.msg='Mission complete!'}});
+ return vm}
+async function exec(src,ms,stop){let t;try{t=makeVM().dictate(src+'\n');
+ while(t.status==='paused'){await new Promise(r=>setTimeout(r,ms));if(stop()){t.cancel();S.msg='Stopped';ui.draw();return}t.resume()}
+ if(!S.over)S.msg='Program ended before the mission was complete'}catch(e){if(!(e instanceof KernelError))throw e;if(!S.over)S.msg=e.message}ui.draw()}
+//</core>
+const $=id=>document.getElementById(id),prog={};let cur=0,busy=false,stopReq=false,best={};
+try{best=JSON.parse(localStorage.getItem('rk-best')||'{}')}catch(e){}
+const size=s=>s.replace(/\\[^\n]*/g,'').split(/\s+/).filter(Boolean).length;
+ui.draw=()=>{const map=$('map'),rv=$('rv');map.style.width=`calc(var(--c)*${S.w})`;map.style.height=`calc(var(--c)*${S.h})`;
+ const T=$('tiles');T.style.gridTemplateColumns=`repeat(${S.w},var(--c))`;
+ T.innerHTML=S.g.map((r,y)=>r.map((c,x)=>`<i class="${{'#':'r','~':'s',o:'o','*':'x'}[c]||''}">${c==='~'?'≈':c==='*'?'◆':x===S.bx&&y===S.by?'⌂':''}</i>`).join('')).join('');
+ rv.style.left=`calc(var(--c)*${S.x})`;rv.style.top=`calc(var(--c)*${S.y})`;rv.firstChild.parentNode.style.transform=`rotate(${S.rot}deg)`;
+ rv.classList.toggle('dead',S.over==='fail');
+ if(S.act==='drill'){rv.classList.remove('dr');void rv.offsetWidth;rv.classList.add('dr')}
+ const b=best[S.i];$('hud').innerHTML=`<span>⚡ Power ${S.e}/${LV[S.i].e}</span><span>◆ ${S.total-S.cr}/${S.total}</span><span>🏆 Best ${b?b+' words':'—'}</span>`;
+ const m=$('msg');m.textContent=S.msg+(S.over==='win'?` (${size($('src').value)} words)`:'');m.className=S.over==='win'?'ok':S.over==='fail'?'bad':'';
+ if(S.over==='win'){const n=size($('src').value);if(!best[S.i]||n<best[S.i]){best[S.i]=n;try{localStorage.setItem('rk-best',JSON.stringify(best))}catch(e){}}}};
+function load(i){prog[cur]=$('src').value;cur=i;reset(i);S.act='';$('src').value=prog[i]??LV[i].s;
+ [...$('lv').children].forEach((b,j)=>b.classList.toggle('on',j===i));ui.draw()}
+LV.forEach((L,i)=>{const b=document.createElement('button');b.textContent=L.n;b.onclick=()=>!busy&&load(i);$('lv').append(b)});
+'forward left right scan drill transmit : ; for next if else then not'.split(' ').forEach(w=>{const b=document.createElement('button');b.textContent=w;
+ b.onclick=()=>{const t=$('src');t.setRangeText(w+' ',t.selectionStart,t.selectionEnd,'end')};$('chips').append(b)});
+$('go').onclick=async()=>{if(busy)return;busy=true;stopReq=false;reset(cur);S.act='';ui.draw();
+ $('src').readOnly=true;$('go').disabled=true;$('stop').disabled=false;
+ await exec($('src').value,330,()=>stopReq);busy=false;$('src').readOnly=false;$('go').disabled=false;$('stop').disabled=true};
+$('stop').onclick=()=>{stopReq=true};
+$('copy').onclick=async()=>{const t=$('src');try{await navigator.clipboard.writeText(t.value)}catch(e){t.select();document.execCommand('copy')}
+ $('copy').textContent='Copied ✓';setTimeout(()=>$('copy').textContent='Copy program',1200)};
+load(0);
+</script></body></html>
