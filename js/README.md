@@ -1,4 +1,4 @@
-# Project K — JavaScript V2
+# Project-K v2 — JavaScript Version
 
 ## A small kernel that can grow
 
@@ -18,7 +18,7 @@ a particular CPU. We preserve the design principle that matters here: keep the
 kernel small, make its mechanisms understandable, and let the vocabulary grow
 the language.
 
-JavaScript V2 adds ideas that belong to its own time—browser integration,
+The JavaScript version of Project-K v2 adds ideas that belong to its own time—browser integration,
 explicit Tasks, resumable execution, and a continuation that can pause while
 the outside world does something else.
 
@@ -317,7 +317,7 @@ a seed primitive?
 Forth has long had the idea of a current input buffer and a position within it.
 Project K represents that explicitly with an `Input` object:
 
-| Concept | JavaScript V2 |
+| Concept | Project-K v2 JavaScript |
 | --- | --- |
 | Logical TIB | `input.tib` |
 | Character position | `input.itib` |
@@ -735,7 +735,7 @@ guarantees clear rather than pretending to provide rollback it cannot provide.
 
 In the Python implementation, host words can use Python modules and objects.
 
-In JavaScript V2, the browser itself offers a huge host environment:
+In the JavaScript version of Project-K v2, the browser itself offers a huge host environment:
 
 - DOM
 - `fetch`
