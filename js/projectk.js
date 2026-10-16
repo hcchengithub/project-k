@@ -11,8 +11,8 @@
  * Tasks are cooperative and not thread-safe.  Frames are task-private, but the
  * data stack, vocabulary and single unfinished definition remain shared.
  *
- * Tested on Node (>= 18).  The kernel imports nothing from Node, so it should also load as
- * an ES module in a browser; that has not been tried yet.
+ * The kernel imports nothing from Node and can load as an ES module in a modern browser.
+ * Browser pages with a strict CSP may block dynamic host-code compilation used by code/end-code.
  */
 
 export class KernelError extends Error {
