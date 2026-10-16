@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project K Browser Test Runner</title>
+<style>
+body{font:16px/1.5 system-ui,sans-serif;max-width:900px;margin:auto;padding:24px}
+pre{font-family:ui-monospace,Consolas,monospace;white-space:pre-wrap}
+.ok{color:green}.bad{color:#b00020}
+</style>
+</head>
+<body>
+<h1>Project K — Browser Test Runner</h1>
+<p>The test cases are shared with the Node.js runner. Only this runner is browser-specific.</p>
+<pre id="out"></pre>
+<script type="module">
+import { runAll } from "./test.js";
+const out = document.getElementById("out");
+const line = (text, cls="") => {
+  const span = document.createElement("span");
+  span.className = cls;
+  span.textContent = text + "\n";
+  out.append(span);
+};
+const result = await runAll(r => {
+  if (r.ok) line("✓ " + r.name, "ok");
+  else line("✗ " + r.name + "\n    " + (r.error?.stack || r.error), "bad");
+});
+line("\n" + result.passed + " / " + result.total + " passed", result.passed === result.total ? "ok" : "bad");
+document.title = `Project K tests: ${result.passed}/${result.total}`;
+</script>
+</body>
+</html>
