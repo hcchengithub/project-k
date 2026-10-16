@@ -1,28 +1,26 @@
 # Project K — JavaScript V2
 
-## A small kernel, a growing system, and our debt to eForth
+## A small kernel that can grow
 
-Project K stands consciously in the **eForth lineage**.
+Project K follows the **eForth tradition** of growing a useful Forth system from
+a very small kernel.
 
 The question that guides this implementation is not, “How many useful words can
-we put into a Forth kernel?” It is almost the opposite:
+we put into the kernel?” It is almost the opposite:
 
 > **How little can a kernel know, while still giving us enough power to grow a
 > whole system?**
 
-That question is part of what eForth taught us. A Forth system does not have to
-begin rich. It has to begin **fertile**.
-
-Project K carries that lesson into a modern JavaScript host. We do not try to
+Project K carries that idea into a modern JavaScript host. We do not try to
 reproduce every historical implementation detail of an older machine: a flat
 dictionary address space, a particular threading model, or the constraints of
-a particular CPU. We try to preserve the deeper lesson: keep the kernel small,
-make its mechanisms understandable, and let the vocabulary grow the language.
+a particular CPU. We preserve the design principle that matters here: keep the
+kernel small, make its mechanisms understandable, and let the vocabulary grow
+the language.
 
 JavaScript V2 adds ideas that belong to its own time—browser integration,
 explicit Tasks, resumable execution, and a continuation that can pause while
-the outside world does something else. Those additions are new branches. The
-root remains eForth.
+the outside world does something else.
 
 The language-independent contract lives in
 [the conceptual specification](../docs/project-k-conceptual-spec.md). The
@@ -131,8 +129,8 @@ application-specific vocabulary.
 why not simply hardwire all of them?
 
 Because usefulness is not the same thing as *kernel responsibility*. If a
-facility can be grown naturally from a smaller mechanism, eForth's lesson asks
-us to consider leaving it outside the seed.
+facility can be grown naturally from a smaller mechanism, it is worth asking
+whether it belongs outside the seed.
 
 Try **“1 · Bare kernel”** in [`demo.html`](https://raw.githack.com/hcchengithub/project-k/master/js/demo.html). The lab itself loads a small teaching
 vocabulary after creating the VM, but the experiment lets you inspect where the
@@ -166,7 +164,7 @@ What happened?
 4. A Word named `double` was published in the vocabulary.
 5. Later lookup of `double` found that Word and executed it.
 
-This is the first step in the eForth pattern:
+This is the first step in the small-kernel growth pattern:
 
 ```text
 small seed
@@ -307,8 +305,8 @@ end-code
 : over 1 pick ;
 ```
 
-Again the eForth question appears: if a word can be grown, does it deserve to
-be a seed primitive?
+The same question appears again: if a word can be grown, does it deserve to be
+a seed primitive?
 
 ---
 
@@ -435,7 +433,7 @@ are built.
 The same principle can grow strings, conditionals, loops, and application
 syntax.
 
-eForth's inheritance is visible again: **syntax itself can grow out of words.**
+The same small-kernel principle shows up here: **syntax itself can grow out of words.**
 
 ---
 
@@ -834,7 +832,7 @@ The kernel never had to learn what a box, wall, keyboard, or HTML element is.
 
 A small kernel became an application because the system could grow.
 
-That is where our debt to eForth becomes visible rather than ceremonial.
+That is where the eForth lineage becomes visible in the design itself.
 
 ---
 
@@ -988,12 +986,13 @@ one fashionable application with the kernel itself.
 
 ---
 
-# Closing — Remember the teacher
+# Closing
 
 Project K contains things eForth did not need to contain: JavaScript host
 integration, explicit resumable Tasks, browser applications, and a path toward
 future asynchronous or AI-assisted work.
 
-But we should not mistake new machinery for a new first principle.
+Those mechanisms are new. The design principle is not: keep the kernel small,
+understandable, and capable of growth.
 
-The first principle is older:
+**Small kernel. Extensible language. A modern continuation of the eForth idea.**
