@@ -114,16 +114,23 @@ versions; only the mechanism that *runs and reports* them is host-specific.
 
 ## 1. Look at a newborn VM
 
-A fresh VM is intentionally almost empty:
+A fresh VM is intentionally almost empty.
+
+Open the [browser lab](https://hcchengithub.github.io/project-k/js/demo.html),
+open DevTools, and in the Console create a brand-new VM:
 
 ```js
-import { VM } from
-  "https://cdn.jsdelivr.net/gh/hcchengithub/project-k@master/js/projectk.js";
-
 const vm = new VM();
-console.log([...vm.words.keys()]);
-// ["code", "end-code"]
 ```
+
+Now ask it what words it knows:
+
+```js
+console.log([...vm.words.keys()]);
+```
+
+Try it yourself before reading on. You should discover that the newborn VM
+contains only `code` and `end-code`.
 
 That is not a toy state we immediately hide. It is the architectural statement.
 
