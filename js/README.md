@@ -116,6 +116,15 @@ versions; only the mechanism that *runs and reports* them is host-specific.
 
 A fresh VM is intentionally almost empty.
 
+A standalone browser module can import the Project-K constructor directly:
+
+```js
+import { VM } from
+  "https://cdn.jsdelivr.net/gh/hcchengithub/project-k@master/js/projectk.js";
+```
+
+The browser lab already imports it and exposes `VM` for experimentation.
+
 Open the [browser lab](https://hcchengithub.github.io/project-k/js/demo.html), press **F12 to open the web browser DevTools**, choose the **Console** tab, and create a brand-new VM:
 
 ```js
@@ -125,11 +134,14 @@ const vm = new VM();
 Now ask it what words it knows:
 
 ```js
-console.log([...vm.words.keys()]);
+[...vm.words.keys()]
 ```
 
-Try it yourself before reading on. You should discover that the newborn VM
-contains only `code` and `end-code`.
+What do you get? Try it before reading on. The newborn VM should report:
+
+```js
+["code", "end-code"]
+```
 
 That is not a toy state we immediately hide. It is the architectural statement.
 
