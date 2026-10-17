@@ -46,6 +46,8 @@ details{margin-top:12px;font-size:13px}summary{cursor:pointer}footer{margin-top:
 </main>
 <script type="module">
 import { VM, Literal, KernelError } from "https://cdn.jsdelivr.net/gh/hcchengithub/project-k@master/js/projectk.js";
+// DevTools: VM is the constructor; vm is the current game instance.
+window.VM = VM;
 
 //<core>
 const LV=[
@@ -77,7 +79,7 @@ function makeVM(){const vm=new VM(),imm=(n,f)=>vm.define(n,f,{immediate:true}),c
     if(t==='$'){S.g[y][x]=' ';S.gold--;S.act='gold';S.msg='Coin collected!'}
     if(!S.gold){S.over='win';S.msg='All coins collected!'}}
    ui.draw();if(!S.over&&S.e<=0)fail('The torch went out. You are trapped in the dark.');yield m.pause();if(S.over==='win')m.abort()})}
- return vm}
+ window.vm = vm;return vm}
 async function exec(src,ms,stop){let t;try{t=makeVM().dictate(src+'\n');
  while(t.status==='paused'){await new Promise(r=>setTimeout(r,ms));if(stop()){t.cancel();S.msg='Stopped';ui.draw();return}t.resume()}
  if(!S.over)S.msg='Program ended with '+S.gold+' coin'+(S.gold===1?'':'s')+' still hidden'}catch(e){if(!(e instanceof KernelError))throw e;if(!S.over)S.msg=e.message}ui.draw()}
