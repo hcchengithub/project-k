@@ -139,9 +139,10 @@ Because usefulness is not the same thing as *kernel responsibility*. If a
 facility can be grown naturally from a smaller mechanism, it is worth asking
 whether it belongs outside the seed.
 
-Try **“1 · Bare kernel”** in [`demo.html`](https://hcchengithub.github.io/project-k/js/demo.html). The lab itself loads a small teaching
-vocabulary after creating the VM, but the experiment lets you inspect where the
-growth began.
+In the **Insert README example…** menu of [`demo.html`](https://hcchengithub.github.io/project-k/js/demo.html), choose
+**Bare kernel / words**, then run it. The example executes `words`: you will see
+the teaching vocabulary that the lab has grown on top of a VM whose original
+seed contained only `code` and `end-code`.
 
 ---
 
@@ -185,7 +186,8 @@ larger vocabulary
 application
 ```
 
-Try **“2 · Grow words”** in [`demo.html`](https://hcchengithub.github.io/project-k/js/demo.html).
+In the lab, choose **Grow a host word** and run it. It defines `double` with
+`code ... end-code`, executes `21 double`, and leaves `42` on the data stack.
 
 ---
 
@@ -265,7 +267,9 @@ redirect references already compiled into existing colon definitions.
 This is a subtle but important property of an evolving Forth system. A name can
 move forward without secretly changing old compiled behavior.
 
-Try **“4 · Captured binding”** in [`demo.html`](https://hcchengithub.github.io/project-k/js/demo.html).
+In the lab, choose **Captured binding** and run it. The example compiles an old
+`square` into another word, redefines the visible `square`, and demonstrates
+that the older compiled reference still keeps its original Word identity.
 
 ---
 
@@ -378,7 +382,9 @@ That is why Project K does not reduce input to an array of tokens at the front
 door. General interpretation reads tokens, but extensions may consume source
 according to their own syntax.
 
-Try **“6 · Context-sensitive input”** in [`demo.html`](https://hcchengithub.github.io/project-k/js/demo.html).
+In the lab, choose **Context-sensitive input** and run it. The example grows a
+word that consumes source text up to its own delimiter, showing that a Word can
+decide how much of the current input to read.
 
 This is one of the mechanisms by which a small kernel gives the *user of the
 language* some power to become a *designer of the language*.
@@ -422,7 +428,9 @@ The host-side building interface is:
 A colon definition is not merely saved source that must be reparsed every time
 it runs. Its action is an ordered sequence of captured operations and literals.
 
-Try **“3 · Colon definition”** and then `see square` in the lab.
+In the lab, choose **Colon definition** and run it. It defines `square` with
+`: ... ;`, executes it, and then `see square` lets you inspect the compiled
+colon body.
 
 ---
 
@@ -632,7 +640,9 @@ and the stack becomes:
 [1, 2, 3]
 ```
 
-Try **“5 · Pause / resume”** in [`demo.html`](https://hcchengithub.github.io/project-k/js/demo.html).
+In the lab, choose **Pause / resume** and run it. Execution stops with the Task
+in the `paused` state; use **Resume paused task** to continue the same Task
+rather than starting the program again.
 
 This is Project K's modern addition to the minimalist Forth story: the kernel
 remains small, but an execution can retain its path while the host regains
@@ -768,7 +778,9 @@ Then:
 s" Project K owns this browser tab" title
 ```
 
-Try **“7 · Browser as host”** in [`demo.html`](https://hcchengithub.github.io/project-k/js/demo.html).
+In the lab, choose **Browser as host** and run it. The example defines a Forth
+word whose host behavior changes the browser page, demonstrating that browser
+capabilities can be borrowed without being built into the kernel.
 
 Notice what the architecture does *not* require: DOM support inside the kernel.
 
