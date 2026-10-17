@@ -82,7 +82,7 @@ async function exec(src,ms,stop){let t;try{t=makeVM().dictate(src+'\n');
  while(t.status==='paused'){await new Promise(r=>setTimeout(r,ms));if(stop()){t.cancel();S.msg='Stopped';ui.draw();return}t.resume()}
  if(!S.over)S.msg='Program ended with '+S.gold+' coin'+(S.gold===1?'':'s')+' still hidden'}catch(e){if(!(e instanceof KernelError))throw e;if(!S.over)S.msg=e.message}ui.draw()}
 //</core>
-const $=id=>document.getElementById(id),prog={};let cur=0,busy=false,stopReq=false,best={};
+const $=id=>document.getElementById(id),prog={};let cur=0,busy=false,stopReq=false,best={},lastRunSource='';
 try{best=JSON.parse(localStorage.getItem('ck-best')||'{}')}catch(e){}
 const size=s=>s.replace(/\\[^\n]*/g,'').split(/\s+/).filter(Boolean).length;
 ui.draw=()=>{document.documentElement.style.setProperty('--c',`min(${Math.floor(920/S.w)/10}vw,${S.w>12?30:44}px)`);
@@ -91,18 +91,18 @@ ui.draw=()=>{document.documentElement.style.setProperty('--c',`min(${Math.floor(
  T.innerHTML=S.g.map(r=>r.map(c=>`<i class="${c==='#'?'r':''}">${c==='$'?'◆':''}</i>`).join('')).join('');
  rv.style.left=`calc(var(--c)*${S.x})`;rv.style.top=`calc(var(--c)*${S.y})`;rv.classList.toggle('dead',S.over==='fail');
  if(S.act==='gold'){rv.classList.remove('pop');void rv.offsetWidth;rv.classList.add('pop')}
- const b=best[S.i],n=size($('src').value);
+ const b=best[S.i],n=size(lastRunSource);
  $('hud').innerHTML=`<span>🕯️ Torch ${S.e}/${LV[S.i].e}</span><span>◆ ${S.total-S.gold}/${S.total}</span><span>🏆 Best ${b?b+' words':'—'}</span>`;
  const m=$('msg');m.textContent=S.msg+(S.over==='win'?` (${n} words)`:'');m.className=S.over==='win'?'ok':S.over==='fail'?'bad':'';
  if(S.over==='win'&&!S.rec){S.rec=1;if(!b||n<b){best[S.i]=n;try{localStorage.setItem('ck-best',JSON.stringify(best))}catch(e){}}}};
-function load(i){prog[cur]=$('src').value;cur=i;reset(i);$('src').value=prog[i]??LV[i].s;
+function load(i){if($('src').value.trim())prog[cur]=$('src').value;cur=i;reset(i);$('src').value=prog[i]??LV[i].s;
  [...$('lv').children].forEach((b,j)=>b.classList.toggle('on',j===i));ui.draw()}
 LV.forEach((L,i)=>{const b=document.createElement('button');b.textContent=L.n;b.onclick=()=>!busy&&load(i);$('lv').append(b)});
 'n s e w n? s? e? w? : ; for next if else then not'.split(' ').forEach(w=>{const b=document.createElement('button');b.textContent=w;
  b.onclick=()=>{const t=$('src');t.setRangeText(w+' ',t.selectionStart,t.selectionEnd,'end')};$('chips').append(b)});
 $('go').onclick=async()=>{if(busy)return;busy=true;stopReq=false;reset(cur);S.rec=0;ui.draw();
  $('src').readOnly=true;$('go').disabled=true;$('stop').disabled=false;
- await exec($('src').value,240,()=>stopReq);busy=false;$('src').readOnly=false;$('go').disabled=false;$('stop').disabled=true};
+ const source=$('src').value;lastRunSource=source;prog[cur]=source;await exec(source,240,()=>stopReq);busy=false;$('src').readOnly=false;$('src').value='';$('go').disabled=false;$('stop').disabled=true};
 $('stop').onclick=()=>{stopReq=true};
 $('copy').onclick=async()=>{const t=$('src');try{await navigator.clipboard.writeText(t.value)}catch(e){t.select();document.execCommand('copy')}
  $('copy').textContent='Copied ✓';setTimeout(()=>$('copy').textContent='Copy program',1200)};
