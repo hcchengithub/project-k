@@ -117,7 +117,8 @@ versions; only the mechanism that *runs and reports* them is host-specific.
 A fresh VM is intentionally almost empty:
 
 ```js
-import { VM } from "./projectk.js";
+import { VM } from
+  "https://cdn.jsdelivr.net/gh/hcchengithub/project-k@master/js/projectk.js";
 
 const vm = new VM();
 console.log([...vm.words.keys()]);
@@ -333,7 +334,8 @@ Project K represents that explicitly with an `Input` object:
 Example:
 
 ```js
-import { Input } from "./projectk.js";
+import { Input } from
+  "https://cdn.jsdelivr.net/gh/hcchengithub/project-k@master/js/projectk.js";
 
 const input = new Input("12 square .");
 console.log(input.read());       // "12"
