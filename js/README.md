@@ -128,13 +128,13 @@ The browser lab already imports it and exposes `VM` for experimentation.
 Open the [browser lab](https://hcchengithub.github.io/project-k/js/demo.html), press **F12 to open the web browser DevTools**, choose the **Console** tab, and create a brand-new VM:
 
 ```js
-const vm = new VM();
+const new_vm = new VM();
 ```
 
 Now ask it what words it knows:
 
 ```js
-[...vm.words.keys()]
+[...new_vm.words.keys()]
 ```
 
 What do you get? Try it before reading on. The newborn VM should report:
