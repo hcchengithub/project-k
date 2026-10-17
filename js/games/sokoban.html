@@ -41,6 +41,8 @@ details{margin-top:12px;font-size:13px}summary{cursor:pointer}footer{margin-top:
 </main>
 <script type="module">
 import { VM, Literal, KernelError } from "https://cdn.jsdelivr.net/gh/hcchengithub/project-k@master/js/projectk.js";
+// DevTools: VM is the constructor; vm is the current game instance.
+window.VM = VM;
 
 //<core>
 const LV=[
@@ -74,7 +76,7 @@ function makeVM(){const vm=new VM(),imm=(n,f)=>vm.define(n,f,{immediate:true}),c
  imm('then',function*(m){cc()[ts().pop()]=new Literal(cc().length);yield*close(m)});
  vm.define('not',m=>{m.push(m.pop()?0:1)});
  const act=(n,f)=>vm.define(n,function*(m){f(m);ui.draw();yield m.pause()});
- 'urdl'.split('').forEach((n,d)=>act(n,m=>mv(m,d)));act('undo',undo);return vm}
+ 'urdl'.split('').forEach((n,d)=>act(n,m=>mv(m,d)));act('undo',undo);window.vm = vm;return vm}
 async function exec(vm,src,ms,stop){if(vm.compiling)vm._discard();let t;try{t=vm.dictate(src+'\n');
  while(t.status==='paused'){if(ms)await new Promise(r=>setTimeout(r,ms));if(stop()){t.cancel();S.msg='Stopped';break}t.resume()}}
  catch(e){if(!(e instanceof KernelError))throw e;S.msg=e.message}ui.draw()}
