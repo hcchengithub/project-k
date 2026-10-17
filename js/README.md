@@ -170,21 +170,17 @@ two-word seed, `code` and `end-code`.
 
 ## 2. Grow the first operation
 
-A code definition borrows the host language:
+A code definition borrows the host language. In the [browser lab](https://hcchengithub.github.io/project-k/js/demo.html), enter:
 
 ```forth
 code double
   vm.push(vm.pop() * 2)
 end-code
+
+21 double .s
 ```
 
-Now:
-
-```forth
-21 double
-```
-
-leaves `42` on the data stack.
+The stack display should show `42`.
 
 What happened?
 
@@ -207,18 +203,6 @@ larger vocabulary
    ↓
 application
 ```
-
-In the [browser lab](https://hcchengithub.github.io/project-k/js/demo.html), key in:
-
-```forth
-code double
-  vm.push(vm.pop() * 2)
-end-code
-
-21 double .s
-```
-
-The stack display should show `42`.
 
 ---
 
@@ -401,31 +385,7 @@ than the next whitespace token**.
 
 ## 7. Let the current word decide how much input it needs
 
-Imagine a word that wants all text up to `|`:
-
-```forth
-code text
-  const value = vm.input.read("|").trimStart()
-  if (vm.compiling) vm.literal(value)
-  else vm.push(value)
-end-code
-immediate
-```
-
-Now this becomes possible:
-
-```forth
-: greeting text Hello from context-sensitive input!| ;
-```
-
-A global tokenizer could not know in advance that `text` wants that region.
-The **current word** knows.
-
-That is why Project K does not reduce input to an array of tokens at the front
-door. General interpretation reads tokens, but extensions may consume source
-according to their own syntax.
-
-In the [browser lab](https://hcchengithub.github.io/project-k/js/demo.html), key in:
+In the [browser lab](https://hcchengithub.github.io/project-k/js/demo.html), define a word that reads text up to `|`:
 
 ```forth
 code text
@@ -438,6 +398,13 @@ immediate
 : greeting text Hello from context-sensitive input!| ;
 greeting .
 ```
+
+A global tokenizer could not know in advance that `text` wants that region.
+The **current word** knows.
+
+That is why Project K does not reduce input to an array of tokens at the front
+door. General interpretation reads tokens, but extensions may consume source
+according to their own syntax.
 
 `text` consumes source up to `|`, demonstrating that a Word can decide how
 much of the current input to read.
@@ -647,7 +614,7 @@ object that carried it out.
 Likewise:
 
 ```js
-const task = vm.execute("square");
+const squareTask = vm.execute(vm.tick("square"));
 ```
 
 starts one Word directly.
@@ -679,13 +646,13 @@ end-code
 Then:
 
 ```js
-const task = vm.dictate("journey 3");
+const journeyTask = window.vm.dictate("journey 3");
 ```
 
 At the pause:
 
 ```text
-task.status   → "paused"
+journeyTask.status   → "paused"
 data stack    → [1]
 ```
 
@@ -694,7 +661,7 @@ Control has returned to JavaScript, but the work is not done.
 Later:
 
 ```js
-task.resume();
+journeyTask.resume();
 ```
 
 and the stack becomes:
@@ -746,9 +713,9 @@ without turning the kernel into a scheduler.
 A paused Task with a live input context can accept more text:
 
 ```js
-const task = vm.dictate("1 pause 2");
-task.appendInput(" 3");
-task.resume();
+const appendedTask = window.vm.dictate("1 pause 2");
+appendedTask.appendInput(" 3");
+appendedTask.resume();
 ```
 
 The result is:
@@ -833,21 +800,7 @@ In the JavaScript version of Project-K v2, the browser itself offers a huge host
 - Web Workers
 - WebGPU, where available
 
-For example:
-
-```forth
-code title
-  document.title = vm.pop()
-end-code
-```
-
-Then:
-
-```forth
-s" Project K owns this browser tab" title
-```
-
-In the [browser lab](https://hcchengithub.github.io/project-k/js/demo.html), key in:
+For example, in the [browser lab](https://hcchengithub.github.io/project-k/js/demo.html), enter:
 
 ```forth
 code title
