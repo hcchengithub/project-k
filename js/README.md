@@ -64,11 +64,11 @@ interactive laboratory used throughout this README: a Forth input area, output,
 data-stack display, vocabulary display, latest-definition display, and Task
 status.
 
-**Learning tip:** If JavaScript or Project-K code is unfamiliar, use an AI
-assistant in your browser's side panel (such as Gemini in Chrome, where
-available). Keep the README and Lab open and ask for a step-by-step explanation
-of any example. You can do this throughout the README. Experiment with changing
-one line, and verify the assistant's explanation by running the code.
+**Learning tip:** Have a question? Make good use of an AI assistant in your
+browser's side panel (such as Gemini in Chrome, where available). Keep the
+README and Lab open, ask questions about any example, and explore the answers
+step by step. You can do this throughout the README; try the code yourself
+to verify the explanations.
 
 The games are applications built *with* Project K, not part of the teaching lab:
 
