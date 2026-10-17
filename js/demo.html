@@ -185,6 +185,7 @@ function resetVM() {
   paused = [];
   lastTask = null;
   vm = new VM({ out: write, KernelError });
+  window.vm = vm;
   vm.dictate(EXPLORER);
   write("Project K ready.");
   write("Teaching vocabulary grown from the two seed words: code end-code");
