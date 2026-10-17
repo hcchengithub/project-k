@@ -733,28 +733,71 @@ Explicit states make the contract easier to reason about.
 
 # Part IX — Work can enter more work
 
-## 18. Nested evaluation preserves context
+## 18. One Task, multiple Inputs — how nested evaluation works
 
-A host operation may do this:
+There are two different questions: **Are we starting a new Task?** And
+**are we entering a new Input?** The four execution interfaces answer them
+differently:
 
-```js
-vm.define("nested", function* (vm) {
-  const outer = vm.input;
+| Interface | New Task? | New Input? |
+| --- | --- | --- |
+| `vm.dictate(tib)` | Yes | Yes, through `evaluate()` |
+| `vm.execute(word)` | Yes | No |
+| `yield* vm.evaluate(tib)` | No | Yes, on the current Task |
+| `yield* vm.call(word)` | No | No |
 
-  yield* vm.evaluate("10 pause 20");
+An Input is **Task-private**, not a global variable stored directly on the VM.
+Each Task owns an Input stack (`task.inputs`). The apparent VM-level property
+`vm.input` is a getter: it returns the top Input of the **currently running
+Task**. Outside an active Task, reading `vm.input` raises an error.
 
-  console.assert(vm.input === outer);
-});
+First, try nested evaluation *without* pausing. In the
+[browser lab](https://hcchengithub.github.io/project-k/js/demo.html), enter:
+
+```forth
+code nested
+  const outer = vm.input
+  yield* vm.evaluate("10 20")
+  console.assert(vm.input === outer)
+end-code
+
+nested .s
 ```
 
-The nested input becomes active while it is being evaluated. When it finishes,
-the enclosing input is restored.
+The stack display should show `10 20`. During `evaluate("10 20")`,
+the Task temporarily has two Inputs: its original input and the nested one.
+When the nested input finishes, it is popped; the assertion verifies that
+`vm.input` once again refers to the **same outer Input object**. No second
+Task was created.
 
-The same idea applies to `yield* vm.call(word)`: a word can enter another
-operation without inventing a new top-level Task.
+Now add suspension. In the same Lab, enter:
 
-This is what makes continuation composition useful rather than merely a
-one-shot pause trick.
+```forth
+code nested-pause
+  const outer = vm.input
+  yield* vm.evaluate("30 pause 40")
+  console.assert(vm.input === outer)
+end-code
+
+nested-pause .s
+```
+
+The Task pauses after pushing `30`. Click **Resume paused task**: it
+continues *inside the nested Input*, pushes `40`, finishes that Input,
+and only then returns to the outer Input and checks the assertion.
+The stack now contains `10 20 30 40` if you ran both examples without
+resetting the Lab.
+
+Why does this work? A paused Task retains its own Input stack and execution
+continuation. While it is paused, another Task can run on the same VM with
+its own Inputs. When the original Task resumes, `vm.input` again follows
+*that Task's* active Input. The VM's dictionary and **data stack**, however,
+are shared: other Tasks can change stack values during the pause.
+
+The distinction to remember is: **`evaluate()` enters a new Input within
+the current Task; `dictate()` starts a new Task.** Similarly, `call()`
+enters a Word in the current Task, whereas `execute()` starts a Task
+for that Word.
 
 ---
 
