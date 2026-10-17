@@ -64,6 +64,12 @@ interactive laboratory used throughout this README: a Forth input area, output,
 data-stack display, vocabulary display, latest-definition display, and Task
 status.
 
+**Learning tip:** If JavaScript or Project-K code is unfamiliar, use an AI
+assistant in your browser's side panel (such as Gemini in Chrome, where
+available). Keep the README and Lab open and ask for a step-by-step explanation
+of any example. You can do this throughout the README. Experiment with changing
+one line, and verify the assistant's explanation by running the code.
+
 The games are applications built *with* Project K, not part of the teaching lab:
 
 - **[Play Sokoban-K](https://hcchengithub.github.io/project-k/js/games/sokoban.html)** ([source](games/sokoban.html))
@@ -751,24 +757,37 @@ Each Task owns an Input stack (`task.inputs`). The apparent VM-level property
 `vm.input` is a getter: it returns the top Input of the **currently running
 Task**. Outside an active Task, reading `vm.input` raises an error.
 
-First, try nested evaluation *without* pausing. In the
-[browser lab](https://hcchengithub.github.io/project-k/js/demo.html), enter:
+First, observe both Inputs *while the nested evaluation is running*.
+In the [browser lab](https://hcchengithub.github.io/project-k/js/demo.html),
+enter:
 
 ```forth
+code inspect-inputs
+  console.log(vm.task.inputs.map(input => input.tib))
+end-code
+
 code nested
   const outer = vm.input
-  yield* vm.evaluate("10 20")
+  yield* vm.evaluate("10 inspect-inputs 20")
   console.assert(vm.input === outer)
 end-code
 
 nested .s
 ```
 
-The stack display should show `10 20`. During `evaluate("10 20")`,
-the Task temporarily has two Inputs: its original input and the nested one.
-When the nested input finishes, it is popped; the assertion verifies that
-`vm.input` once again refers to the **same outer Input object**. No second
-Task was created.
+Open the browser's **DevTools Console** (F12, then **Console**) to see
+the two Input texts logged by `inspect-inputs`. The Lab's stack display
+should show `10 20`. The inspection runs **inside** the nested evaluation,
+while both Inputs still exist. When that evaluation finishes, its Input
+is popped, and the assertion checks that `vm.input` is the **same outer
+Input object** as before.
+
+**Why `yield*`?** `vm.evaluate(...)` is a JavaScript **generator function**.
+Calling it creates a generator object; it does not execute the nested input.
+`yield* vm.evaluate(...)` drives that generator as part of the current Word
+and forwards a pause if one occurs. Without `yield*`, nothing in the
+nested input runs. If generators are unfamiliar, ask your browser's AI
+side-panel assistant to explain the difference, step by step.
 
 Now add suspension. In the same Lab, enter:
 
