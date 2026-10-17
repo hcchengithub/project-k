@@ -46,6 +46,8 @@ details{margin-top:12px;font-size:13px}summary{cursor:pointer}footer{margin-top:
 </main>
 <script type="module">
 import { VM, Literal, KernelError } from "https://cdn.jsdelivr.net/gh/hcchengithub/project-k@master/js/projectk.js";
+// DevTools: VM is the constructor; vm is the current game instance.
+window.VM = VM;
 
 //<core>
 const LV=[
@@ -80,7 +82,7 @@ function makeVM(){const vm=new VM(),imm=(n,f)=>vm.define(n,f,{immediate:true}),c
  act('drill',()=>{if(S.g[S.y][S.x]==='*'){S.g[S.y][S.x]='.';S.cr--;S.msg='Crystal collected!'}else S.msg='No crystal here'});
  act('transmit',()=>{if(S.x!==S.bx||S.y!==S.by)S.msg='Return to base ⌂ before transmitting';
   else if(S.cr)S.msg=S.cr+' crystal'+(S.cr===1?'':'s')+' still to collect';else{S.over='win';S.msg='Mission complete!'}});
- return vm}
+ window.vm = vm;return vm}
 async function exec(src,ms,stop){let t;try{t=makeVM().dictate(src+'\n');
  while(t.status==='paused'){await new Promise(r=>setTimeout(r,ms));if(stop()){t.cancel();S.msg='Stopped';ui.draw();return}t.resume()}
  if(!S.over)S.msg='Program ended before the mission was complete'}catch(e){if(!(e instanceof KernelError))throw e;if(!S.over)S.msg=e.message}ui.draw()}
