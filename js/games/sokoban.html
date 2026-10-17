@@ -97,7 +97,7 @@ function load(i){cur=i;reset(i);vm.dstack.length=0;lvBtns();ui.draw()}
 async function run(src,ms){if(busy)return;busy=true;stopReq=false;$('stop').disabled=false;await exec(vm,src,ms,()=>stopReq);busy=false;$('stop').disabled=true}
 async function replay(n){if(busy)return;reset(cur);vm.dstack.length=0;ui.draw();await run(n,170)}
 document.querySelectorAll('#pad [data-w]').forEach(b=>b.onclick=()=>run(b.dataset.w,0));
-$('rs').onclick=()=>!busy&&load(cur);$('go').onclick=()=>run($('src').value,170);$('stop').onclick=()=>{stopReq=true};
+$('rs').onclick=()=>!busy&&load(cur);$('go').onclick=()=>{const source=$('src').value;$('src').value='';run(source,170)};$('stop').onclick=()=>{stopReq=true};
 $('sv').onclick=()=>{const q=seqOf(vm);if(!q){S.msg='The stack is empty. Make a few moves first.';return ui.draw()}
  const l=saved[cur]=saved[cur]||[],n='solve-'+(cur+1)+(l.length?'-'+(l.length+1):'');
  try{vm.dictate(': '+n+' '+q+' ;')}catch(e){S.msg=e.message;return ui.draw()}
