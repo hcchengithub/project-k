@@ -116,8 +116,7 @@ versions; only the mechanism that *runs and reports* them is host-specific.
 
 A fresh VM is intentionally almost empty.
 
-Open the [browser lab](https://hcchengithub.github.io/project-k/js/demo.html),
-open DevTools, and in the Console create a brand-new VM:
+Open the [browser lab](https://hcchengithub.github.io/project-k/js/demo.html), press **F12 to open the web browser DevTools**, choose the **Console** tab, and create a brand-new VM:
 
 ```js
 const vm = new VM();
