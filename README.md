@@ -18,6 +18,12 @@ V2 begins from a clean, orphaned Git history. It does not carry the [V1](https:/
 
 The conceptual specification describes Project K independently of its implementation language. Each language directory has its own implementation guide.
 
+## AI Integration
+
+Project K V2 provides the foundational capabilities for AI integration, including suspend/resume and host-language interoperability, but the kernel itself does not directly integrate AI.
+
+**[peforth v2](https://github.com/hcchengithub/peforth)**, a Forth system built on Project K, has already integrated AI. It demonstrates how Project K's foundation can be used in a practical AI-enabled Forth environment.
+
 ---
 
 # Project K — 從精簡 Kernel 出發，打造新一代 Forth 系統
@@ -39,3 +45,9 @@ V2 從全新的 orphan branch 歷史開始，工作樹不帶入 [V1](https://git
 - [`js/`](js/)：JavaScript V2 實作與使用說明，請見 [JavaScript README](js/README.md)。
 
 Conceptual SPEC 描述的是 Project K 本身，不綁定 Python 或 JavaScript；各語言目錄則各自說明該語言的實作。
+
+## AI 整合
+
+Project K V2 已具備支援 AI 整合的基礎能力，包括 suspend/resume 與宿主語言互通，但 kernel 本身並未直接導入 AI。
+
+採用 Project K 的 **[peforth v2](https://github.com/hcchengithub/peforth)** 則已經導入 AI，展示如何運用 Project K 的基礎能力，打造實際整合 AI 的 Forth 環境。
