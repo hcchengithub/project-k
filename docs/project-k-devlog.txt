@@ -1,0 +1,769 @@
+ 
+			  ~%~%~%~%~%~%~%~  p r o j e c t - k  ~%~%~%~%~%~%~%~
+		      A Forth programming language implementation with the 
+		    same JavaScript *kernel* for many different applications.
+			    The project focuses on the JavaScript *kernel*. 
+			            Everything else is just for DEMO and auxiliary.
+				   http://github.com/hcchengithub/project-k
+
+---------- developping log --------------------------------------------------------------
+
+[x] hcchen5600 2015/04/28 11:03:11 
+	嘗試用 jeforth.3we 來引入爽哥的 jeForthVM.js 如此即可借用 jeforth.3we 的人機介面以及
+	現成的種種方便。還可以做 performance 的比較。這個辦法是先前玩 transpiler 時發展出來的。
+
+[x] 不容易看懂 The "multitaskjavascripteforth" porject，另謀它途。既然最大的差別是 inner loop
+	何不直接比一下速度？
+	for multitaskjavascripteforth
+		code swap function(){ 
+		  var b=dStk.pop(), a=dStk.pop();
+		  dStk.push(b);
+		  dStk.push(a);
+		} end-code
+		code precise-time(mS) function(){dStk.push((new Date()).getTime())} end-code
+		code space function(){type(" ")} end-code
+		: speed-test 0 swap for 1+ next ;
+		precise-time(mS) 1000000 speed-test . space precise-time(mS) swap - . 
+	for jeforth.3we 同上兩行。
+	結果：
+		multitaskjavascripteforth ~ 4000
+		jeforth.3we ~ 660 快了約 6 倍。
+	所以，先別管 inner loop 的差別了。
+	
+[x]	"multitaskjavascripteforth" 的十一條建議：
+	 1、exec(tib) 建議命名為 dictate(tib) , 英文 Dictate（吩咐）似乎像
+		在對 Forth 交代工作。hcchen5600 2015/04/27 15:18:26
+	 2、waiting 以及 resume 如何運作，需要指導。 hcchen5600 2015/04/27 15:20:02
+	 3、建議以 comma(x) 為名。x is anything, 配合 tick(name) 成為 
+		comma(tick(‘wordName’)) 即可編譯 word 進字典。 hcchen5600 2015/04/27 15:25:22
+	 4、rstack 或 rStack 不要簡寫。 hcchen5600 2015/04/27 15:26:26
+	 5、用得很多，建議單稱 stack , 不要簡寫。
+	 6、用得很多，建議直接命名為 push(t) 。 hcchen5600 2015/04/27 15:28:49
+	 7、建議稱為 tick(n) hcchen5600 2015/04/27 15:34:57
+	 8、稱為 comma(x) , 配合 tick(n) 使用：comma(tick(‘namd’))
+	 9、var w = new Word(‘name’); last().xt = function(){…}; last().vid = ‘forth’; 
+		這樣比較好懂，也符合 forth 的慣例 （例如 immediate 就是等前一個 word 產生之
+		後才填的屬性） hcchen5600 2015/04/27 16:16:16
+	10、建議提供 last(void) , 故 last().compileOnly=true; last().immediate=true; 感
+		覺比簡寫好。 hcchen5600 2015/04/27 16:18:15
+	11、另一種設計是： vocs = [‘forth’, ‘assembler’, ‘excel’, ‘canvas’]; words.forth[] 
+		是 forth vocabulary, 另有 words.assembler[], words.excel[], 以及 words.canvas[] 等。
+		用哪一種好，應該怎麼決定？ hcchen5600 2015/04/27 16:23:00	
+[x] project-k introduction to FigTaiwan
+	[/] 主動用 Google polling 催請 FigTaiwan 回覆意見
+	[/]	introduce to lang.forth after FigTaiwan approve it.
+	
+	[X] jeforth.js 的結構如下，這樣好嗎？
+		---- jeforth.js 只有三塊，如下三行 ----
+		"uses strict";
+		function jeForth(){。。。} // 定義 Forth VM constructor
+		if (typeof exports!='undefined') exports.jeForth = jeForth;	// export for Node.js APP
+		----------------------------
+	[X] Forth VM constructor 命名 KsanaVM() 請賜意見。==> jeForth()
+	[x] jeforth.js 的產出就是一個 Forth VM constructor，而非一個 instance。所
+		以 instance 可以任意命名。例如 var vm = new jeForth();
+
+	[x] 審查 jeforth.js, 引入 var g = {}; // global hash
+		這個 hash table 用來讓 Forth 的 global variables 直接與 JavaScript 互通。
+		例如 52 constant myAge 則 JavaScript g.myAge 就是 Forth myAge 的 PFA。
+		請賜意見。
+		==> 還得請示意見就表示太過頭了，直接拿掉，當成「建議」recommendation 即可。
+			有興趣的 implementation 應由 main program, say index.html, 引入 vm.g 實現。
+
+	[x]	目前這個 g structure 沒有管理機制。用著用著可能 properties 會重複、覆蓋、衝突。
+		請賜意見。
+		==> 同上，由 each implementation 各自決定。
+
+ 	[x] TIB string / #TIB pointer 的命名：
+		tib / ntib 
+		tib / itib <===== 用這個
+		或別的，這需不需要注意？請賜意見。
+
+
+[x] root vocabulary should be root. Modify baby.html and bbt.html.
+	一改成 root 馬上感受到麻煩。因為一開始沒有 vocabulary 可用，必須用直接填的才能切換。應該還好。
+[x] 我還是要提供 bbt.html 表示 jeForth 的能耐，最好能 demo 一下 h2o.f 更好。
+	==> No. 只提供 baby.html，要完整的 forth 系統直接介紹 jeforth.3we。
+[x] change all kvm to vm.
+[x] remove kernel.js , kernel.f 
+[/] 上英文社群推廣 jeforth kernel。
+[x] textarea 稱作 jeforth.f 會引起誤會，以為是讀 file 進來的。改稱 source_code 即可。
+
+
+[x] 報告進度  hcchen5600 2015/05/17 06:22:45 
+
+	> 要把 JeForth 包裝，註解，範例，一樣一樣的做好
+
+	整個 project 只有一個檔案： 20k 不到的 jeforth.js，已經做好了。含 GitHub 必
+	須的 README.md, 範例 baby.html 也完成。這是一個超小的小 project. 我覺得
+	既小就讓它一次小個夠，以收令人一看便覺得「還有半小時，不妨看一看」的鼓
+	勵效果。
+
+	> 而且 Node.js 與 React.js 的融入，都是促進 JeForth 熟化的必然要素
+
+	我心目中的這個 jeForth kernel 嚴守 kernel 的本分，不多做任何一丁點。也就
+	是把一切應用交給 user, 連 dup swap if else then 等都屬應用層面。也就是只
+	照顧 code end-code 以及少數必要的公用 functions (i.e. pop(), push(), last() 等) , 
+	properties (i.e. words[][], dictionary[], stack[], rstack[] 等) 此外無他。
+
+	Node.js 是咱的 host 之一，本 kernel 企圖 porting 到所有的 JavaScript host 故必
+	須能支援，也已經可以支援。我還不知道 react.js，如果是應用層我不管，如果也
+	是個 JavaScript host 則同樣必須支援。
+
+	以上報告。
+
+	請上 GitHub > project-k 整包 zip 抓下來，直接在 local computer 執行 baby.html 欣
+	賞該 demo。查看 jeforth.js 看短短的程式架構、註解、變數取名、function 取名等
+	好不好懂，並請賜教。
+		
+[x] baby.html 中扯進 jquery 有違盡量簡單的目標。但是不用 jquery 則 
+		$('#outputbox').append(plain(ss));
+	改寫起來就會很麻煩。
+	<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>	
+	
+[x] 錯了！ kernel 怎知自己叫作 vm ??????? init() 要改。
+	> vm.init.toString()
+	'function () { \r\n\t\ttype = vm.type;\r\n\t}'		
+	[x] baby.html  [x] node.js
+	==> 其實沒錯，因為 jeforth.js 裡面看到的 vm 就是自己。不是外面那個 vm instance.	
+
+[x] 準備回應爽哥要求 jeforth.html 改寫中, 
+	[x] jsc 還有問題, drop it
+	[x] sample code baby.html , cub.html ... done
+
+[x] cub.f 直接在 jeforth.3we 裡試驗 project-k-kernel 很成功。一下就把 cub.f
+	run 起來了。cub.f 沒有 selftest 所以不可靠, jeforth.3we 穩是基本要求。準備
+	改用 3we/kernel/jeforth.f 
+[x] 用了很久的 packhelp() 傳回 "( foo ) bar" 或者 "( ?? ) No help message. Use // to add one."
+	等於是從 tib 抽 help 出來。用新的 "parse-help" 取代，方法如下：
+		push(nexttoken('\n|\r')); // rest of the first line
+		execute("parse-help"); // ( "helpmsg" "rests" )
+		tib = pop() + " " + tib.slice(ntib); ntib = 0; // "rests" + tib(ntib)
+		newhelp = pop();
+[x] project-k 的 panic 要表明身分,否則搞搞不清楚.
+		
+[x] 從 jeforth.3we 下命令給 project-k VM 用 hotkey f8：--> cub.f
+[x] cub.f 好了,攻 selftest, 改良。
+[x] Original (words) in jeforth.f is very powerful but without -v and -V. 
+	While words and help was poor, because they were rely on voc.f unnecessarily.
+	So we need to improve words and help. --> 規定好 input 格式, 有助化簡程式。
+	words/help [pattern [switch [argument]]]
+[x] 老經驗
+	nexttoken('\n|\r'); // if use only '\n' then we get an unexpected ending '\r'.	
+[x] see ~(create)~
+	JavaScript error on word ".0r" : Cannot read property 'length' of undefined
+	==> RI,FP: 產生一個 colon word 方法很多，不一定已經有 cfa。  
+[x] 用 vm.init() 來設定 type() or print() function 多此一舉。已經有 vm.clearScreen 等
+	乾脆就不要 init() 了。projct-k 根本不知道也不用知道你需要 print() !!
+	==> jeforth.js 有用到 type() 這樣一來 project-k 就認為自己在有 display 的地方執行?!
+		雖然可以從 type() 的定義解決，總是不太理想。
+	==> 用到 type() 的地方
+		1. docode() 的 reDef warning ==> 改 call panic(state-object). 
+		2. panic() ==> 所有 error/warning 都 call panic() 如前。但 panic() 裡面先檢查有
+		   沒有 vm.panic() 然後 call vm.panic(state)。
+		3. reset() 的 message 沒啥意義
+	==> 已經都用 k :: type=function..., k :: prompt=.. 的方式。
+[x] Javascript 的 string 有 trim() method 可以去頭尾 white spaces, 從來不知。
+	But! project-k can't use string.trim(), Windows XP JScript does not support that.
+	String.replace(/(^( |\t)*)|(( |\t)*$)/mg,''); // remove 頭尾 whitespaces. .trim() 舊 JScript v5.6 未 support
+[x]	stackwas 放在 jeforth.js kernel 裏頭有必要嗎? --> 改成 tick(':').stackwas 了。
+[x] 要參考 code word 自身,用 tick('name') 是可以考慮。有更好的辦法嗎?
+	==> 現在 _me 直接就是該 word object 本身。
+[x] working on db bp *debug* for cub.f
+	==> resume function needs a static variable.
+		--> see processing.f, "JavaScript Module Pattern: In-Depth" in YouDao Notebook.
+	==> I only want to get the code word object	in its xt(), it's the argument! So,
+		simply call w.xt(w) passes w over, this simple! This is done in the inner().
+		also "newxt=function(_me){..." in docode() of kernel jeforth.js.
+	==> 經由 "newxt=function(_me){..." in docode() of kernel jeforth.js, and
+		simply call w.xt(w) in the inner() loop, we have _me in any code word
+		that indicates the code word itself.
+[x]	root word-list 還是叫 'forth' 好了, 當初想的是讓 project-k 盡量中性，先有 root 然
+	後再加上 forth voc 等。但因為 kernel jeforth.f 本身不 support vocabulary, 故以上
+	已經落空，根本分不出 root 跟 forth 不如就用 forth。還是可以在 voc.f 進來了以後再
+	拆分 root 跟 forth。但這麼做有何意義? 既無意義就表示都是 forth 即可。
+	所以 forth 變成永遠都在的部分，不想讓 words help 太雜亂時，盡量用 only work.f,
+	only git.f 等來讓輸出清爽。故 words 的 -v -V -V- option 都不必了，好耶。
+[x] should be moved to voc.f
+	source-code-header ( -- ) \ The source-code-file.f header macro 
+[x] cub.f 寫好了以後要併回 cub.html, project-k 保持單純。
+[x] 大改寫, 
+	[x] voc.f help calls (help) but origianl (help)/help 的 系統 help 要重新調配. 
+		(help) 不該負責印系統 help --> (words) words , voc.f words help ok
+	o	所有 g.sth 改成 vm.g.sth
+	o	fortheval --> dictate
+	o	print --> type 
+	o	kvm --> vm
+[x] jeforth.3we 的 'kernel' directory 直接就是 project-k 以免搞不清楚.
+	本來認為是 kernel 的 jeforth.f 跟 voc.f 則搬到 f 裡去。不當作 kernel 了。
+	[x]	這個要把 kernel 拿掉, 以 3htm 為例,
+		kvm.path = ["dummy","f", "3htm/f", "3htm/canvas", "3htm", "playground"];
+[x]	這兩個不必佔用 vm.member , 應該直接放進 *debug* 的 members。
+	因為掛在 vm 下的 properties 都要有關聯 vm 內外的目的，如 vm.type(), vm.prompt, 
+	等. bp 跟 continue 或 resume 純粹是 jeforth.f 內部的東西, 應該屬於 value 放
+	在 vm.g 下才對. 宣告成 value 就對了。
+		// debug
+		vm.bp = 0 // breakpoint  <---- tick("*debug*").breakpoint=0
+		vm.continue = 0 // *debug* resume point   <---- tick("*debug*").resume=null
+	[x] index.html [x] cub.html
+	
+[x] some application didn't use this trick
+		e = (e) ? e : event; var keycode = (e.keyCode) ? e.keyCode : (e.which) ? e.which : false;
+	[x] index.html of 3HTML, [x] baby.html of project-k, [x] cub.html of project-k
+[x] chrome f12 跑出一個 message : 
+	cub.html:6 Resource interpreted as Stylesheet but transferred with MIME type text/plain: "http://localhost:8888/common.css".
+	我不喜歡這個解釋 http://stackoverflow.com/questions/12003107/resource-interpreted-as-script-but-transferred-with-mime-type-text-plain-for-l
+	用 Win8 ie10 也一樣有問題 SEC7113: CSS was ignored due to mime type mismatch 
+	--> utf-8 改成 ANSI 也沒用
+	==> 改直接執行 cub.html 就好了 (不透過 localhost:8888) --> 可能是 webserver.f 的問題.
+	==> 果然是 webserver.f 的問題! https://msdn.microsoft.com/en-us/library/hh180764(v=vs.85).aspx
+		RI : An imported style sheet was not used due to the wrong MIME type in the HTTP header.
+		FP : Ensure style sheet file is delivered with the proper HTTP response header, which includes 
+		     a content type of text\css. See MIME-Handling Changes in Internet Explorer for more information.
+[x]	ie10 還抓到 cub.html 好多別的問題
+	HTML1402: Character reference is missing an ending semicolon ";". 
+	cub.html, line 243 character 22
+	HTML1402: Character reference is missing an ending semicolon ";". 
+	cub.html, line 707 character 62
+	HTML1402: Character reference is missing an ending semicolon ";". 
+	cub.html, line 707 character 124
+	HTML1402: Character reference is missing an ending semicolon ";". 
+	cub.html, line 710 character 34
+	HTML1402: Character reference is missing an ending semicolon ";". 
+	cub.html, line 712 character 103
+	在 chrome 都沒問題,而且所列之處根本就是 forth code ! 別管他。
+[x] 3htm jsc 裡 erase 無效 ... 感謝我自己! 以前已經發現在 jsc console 時
+	inputbox.value 是 \10 因為 \r\n 只吃掉 \r 故留下 \n 使得 inputbox 非 empty 因此
+	{backspace} 不工作。修改判斷條件為 inputbox.value==""||inputbox.value=="\n" 即可
+[x] tweak cub.html on going . . . so as to make a project-k release
+[x] 12:18 2017-09-23 jeforth.js 改名為 projectk.js 因為 peforth 的 kernel 叫
+    projectk.py 如果叫 peforth.py 整個 project 就會到處都是 peforth.xxx 搞不清都是些啥。
+[x] peforth 1.15 之後增加了 function cascading 的功能，應該要更擴大點，不限於
+    ok, dictate, push, execute 至少還有 tick 也要 <-- 錯，tick 本來就有 return 值。
+[x] cascade 擴展到 project-k.js 版。奇怪，以前有改好過怎麼不見了？
+    --> 確定有
+        > <js> push(123).dictate(" dup + . ")</js>
+        246 OK 
+    
+[x] 整理 project-k 的 wiki. 特別是改名成 projectk.js 之後。而且還增加了 projectk.py 
+[X] 把 project-k 的 jquery 拿掉不用，避免 rawgit 老是出問題。
+    目前 baby.html 經由 rawgit 執行時，要改成 https 才能 include 到 projectk.js. 而 sample.html
+    沒有出錯，但是半路就停住了。兩者用 local host 執行都沒問題。
+    12:45 2026-10-06 Done
+    
+[X] 2020/03/23 14:07:46 sample.html 在 2018.7.23 之後到今天之前都是 corrupted 一直都沒發現，今從 2018.7.20
+	舊版救回來，在 chrome 上一次 ok。
+[X] 2020/03/23 16:08:42 發現 sample.html selftest 不過，因為缺 vm.greeting() 且 invisible 也沒寫好。
+	proeforth.html 弄好了，奇怪，以前是怎麼過的？
+[ ] 10:53 2020/12/04 向爽哥介紹 project-k 馬上發現此前寫法不漂亮。
+    定義 dstack 就該把 push pop 包進去變成是它的 method 
+    comma() here 是 dictionary 的 method and property 
+    etc 
+[X] 12:47 2026-10-06 用 AI 倒推成 SPEC，然後再回頭實現出來。
+    最近在學會 LINE 群討論到用 AI 做比較正經的事情時，要讓它先寫 conceptual SPEC，然後寫 implementation plan.
+    昨天 2026.10.04 禮拜天，我在計程車上想到：那要不然就請 AI 幫我把 peforce 的 kernel project-k 現有的 kernel code 
+	反推回 SPEC，然後再實作回來，看看效果怎麼樣。
+    因為那時候我才剛開始學 Python，一直覺得原本的 code 寫得不是很好。結果在計程車上，這些事情說著說著初版就已經完成了！
+    以下我把 AI 幫我寫好的 SPEC、展開回來的 Python source code，以及它裡面有一個非常有意思的新 word 叫 "pause" 請 AI 講解清楚。。。。
+    --
+    13:11 2026-10-06
+    Python 的成果就是目前的 v2，那本來的就是 v1。
+    --
+    [ ] 13:12 2026-10-06
+    試試看倒推 projectK.js
+
+[X] 09:19 2026/10/09 project K, AI container 隨時都在吃錢！
+	(misc) hcchen@Desktop-Jianfu:~$ f
+	Project K Forth REPL
+	Type 'words' to list words, 'ai: <prompt>' to ask AI, or 'bye'/Ctrl-D to exit.
+
+	> words
+	code end-code \ ( immediate // /// (last) dup drop dropall swap over rot depth >r r> r@ rdrop * + - / = <> < > <= >= 1+ 1- nip 0= not . .s cr space : ; , ! @ create (does>) does> char constant variable value to branch 0branch doNext here (s) string-quote s" s' s` s| s^ s/ BL word ' ['] [compile] begin until again if ahead then else while repeat aft for next last <py> </py> </pyV> CR py: py> py:: py>> (::) (:>) :: :> see pause *debug* words help bye cls (ai-line) (ai) ai-new ai-sessions ai-session ai-use ai-transcript ai-items ai-containers ai-container ai-cleanup ai-status ai-cancel ai:
+	 ok
+	> ai-sessions
+	Remote sessions: 1 (newest first)
+	  1. sess_0d24070289a3f9d1006ac7b88040448194834849253847c85d  2026-10-08 23:36:32 CST  idle  gpt-6-astra  env=openai_hosted *
+	 ok
+	> ai-containers
+	Hosted environments linked to sessions: 1
+	  1. env=ccarenv_b64_Y2NhcmVudl82YWM3Yjg4MDQzNjA4MTkxYjEwY2IxOWY5OGI5YTg2Mg  status=disconnected  size=medium  session=sess_0d24070289a3f9d1006ac7b88040448194834849253847c85d
+	 ok
+	> 1 ai-container
+	Environment 1: ccarenv_b64_Y2NhcmVudl82YWM3Yjg4MDQzNjA4MTkxYjEwY2IxOWY5OGI5YTg2Mg
+	Session: sess_0d24070289a3f9d1006ac7b88040448194834849253847c85d
+	Status: disconnected
+	{
+	  "type": "openai_hosted",
+	  "id": "ccarenv_b64_Y2NhcmVudl82YWM3Yjg4MDQzNjA4MTkxYjEwY2IxOWY5OGI5YTg2Mg",
+	  "object": "agent.environment",
+	  "status": "disconnected",
+	  "files": [],
+	  "skills": [],
+	  "plugins": [
+		{
+		  "type": "inline",
+		  "name": "projectk-forth",
+		  "description": "Project K Forth language guidance for the Python CLI agent."
+		}
+	  ]
+	}
+	 ok
+	> 1 ai-cleanup
+	This permanently deletes session 1: sess_0d24070289a3f9d1006ac7b88040448194834849253847c85d and its conversation.
+	If it has a hosted sandbox, deletion also requests sandbox cleanup.
+	Type 'delete' to confirm, or 'cancel' to keep the session.
+	Delete session 1 (sess_0d24070289a3f9d1006ac7b88040448194834849253847c85d)? Type delete or cancel: delete
+	AI session deleted from the API; physical cleanup may continue asynchronously.
+	 ok
+	> ai-containers
+	Error: ai-containers: Run ai-sessions first to refresh the remote list and its sequence numbers.
+	> ai-sessions
+	No remote sessions found.
+	 ok
+	> ai: tell me a joke  <--------- 故意製造活動產生一個新的 session
+	Why did the Forth programmer bring a ladder to work?
+	Because they heard the stack was getting deep.
+	 ok
+	> ai-sessions
+	Remote sessions: 1 (newest first)
+	  1. sess_0622767e7305d828006ac83e406ba88193836e4ea1a9019abf  2026-10-09 09:07:13 CST  idle  gpt-6-luna  env=none *
+	 ok
+	> ai-containers
+	No hosted environments are linked to the listed sessions. <----- 我們已經不用 container 了，所以新的活動也沒有產生 container。
+	 ok
+	> ai-sessions
+	Remote sessions: 1 (newest first)
+	  1. sess_0622767e7305d828006ac83e406ba88193836e4ea1a9019abf  2026-10-09 09:07:13 CST  idle  gpt-6-luna  env=none *
+	 ok
+	> 1 ai-transcript
+	[user]
+	tell me a joke
+
+	[assistant]
+	Why did the Forth programmer bring a ladder to work?
+	Because they heard the stack was getting deep.
+
+	 ok
+	> 1 ai-items  <-------- [X] 這個跟前一個命令應該可以合併，應該叫做 AI Context，然後加個 switch，比如說 --json (類似 Hermes Agent 的看板命令) --> ai-context 
+	{
+	  "type": "message",
+	  "id": "msg_bac516456d2cfb33e34b13b7517f8fc73b271cf6ff041efa83",
+	  "turn_id": "turn_0622767e7305d828006ac83e459af081939b258b28328ed2c6",
+	  "role": "user",
+	  "content": [
+		{
+		  "type": "input_text",
+		  "text": "tell me a joke"
+		}
+	  ],
+	  "status": "completed",
+	  "phase": null
+	}
+	{
+	  "type": "message",
+	  "id": "msg_0bd7bb5f8a585084016ac83e4556fc87d1b9e330a340f51484",
+	  "turn_id": "turn_0622767e7305d828006ac83e459af081939b258b28328ed2c6",
+	  "role": "assistant",
+	  "content": [
+		{
+		  "type": "output_text",
+		  "text": "Why did the Forth programmer bring a ladder to work?  \nBecause they heard the stack was getting deep."
+		}
+	  ],
+	  "status": "completed",
+	  "phase": "final_answer"
+	}
+	 ok
+	> ai-status <-- [X] 應該要順便看這個 session 有沒有 container 
+	Active AI session: sess_0622767e7305d828006ac83e406ba88193836e4ea1a9019abf
+	Locally indexed sessions: 1
+	 ok
+	> 1 ai-container
+	Error: ai-container: Container number must be between 1 and 0.
+	>	
+
+[X] 09:28 2026/10/09 確認 Project K Agents API 沒有再繼續 container 扣錢
+	https://platform.openai.com/settings/organization/usage
+
+[X] 19:17 2026/10/09 AI 很喜歡用 .py
+	儘量把 ai_bridge.py 裡面可以改成 colon word, and code word 的，儘量都搬到 ai.f 去。
+	code word 可以 import 那 .py 裡面寫好 basic functions 以後，幾乎其他的都可以寫
+	成 code word 然後 colon words 啦。
+    --
+    14:38 2026-10-11 昨天已經把全部那種東西都搬到 .f 裡面來了，也就是 ai.f。
+    因為我們現在可以 import external .py modules，所以非常方便。
+
+[X] 19:19 2026/10/09 .ai_session.json 
+	.ai_session.json 是個 common file 變成大家都共用! 
+	那如果同時跑好幾個 f 的話會怎麼樣？ AI 會都撞在一起!
+	21:51 2026/10/09
+	ai-context n count 
+	returns user/assistant text for the latest count user-initiated turns; mode defaults 
+	to chat. ai-context n count chat is equivalent, while ai-context n count json 
+	returns all API items, including tool calls and results, within those turns. 
+	The API is queried newest-first and pagination stops once it has found the requested number 
+	of turns. Both forms leave the object on the Forth data stack; use stringify . to print it. 
+	count must be positive. Run ai-sessions first to refresh the sequence numbers.
+
+[X] 20:44 2026/10/09 
+    ai-transcript ai-items <--- 合併成 ai-context ( [--json | --chat] -- object ) Default 是 --chat
+	--> 這個是用 ChatGPT 在幫我做
+	--
+	(ai-context) ( session-number count mode -- object ) Return recent API items or chat messages for a session.
+		Count is the number of most recent user-initiated chat turns. Mode is "json", "chat", or None.
+		json returns all API items in those turns; chat and None return user/assistant text messages.	
+
+[X] 23:39 2026/10/09
+	我們已經有這個 forth word : (ai) 
+	為什麼還需要這個: (ai-request) --> 不需要的，已經拿掉了
+	
+[X] 23:40 2026/10/09
+	我希望我們的 repl 有兩種模式，一個是 chat mode，一個是 forth mode。
+	Chat mode 的 prompt 是這樣子 'chat>'，然後 forth mode 就是 'forth>'  本來的 '>' 就被取代掉了。
+	當 forth mode 的時候，功能不變；但是當 chat mode 的時候，直接跟 AI 對話，不用每次 prefix 'ai:' 
+	
+[X] 23:58 2026/10/09
+	念念不忘，讓 Forth Language 來幫忙下 command line
+	--
+	f -c foo bar 這個已經有了
+	f -c 希望還能夠繼續接著談!!
+
+[X] 14:40 2026-10-11 準備要把 project-k branch: 'v2-migration' 搬進 peforth 取代 v1.33，變成 v2。
+    [X] 14:49 2026-10-11 peforth 的最後一版，v1.33 要 Frozen。那個 tag 本來用過了，那要改成什麼比較好？
+        c:\Users\8304018\OneDrive\Documents\GitHub\peforth
+    --
+    11:07 2026-10-18 v2 已經都搞定，而且上線了。
+    有 Python 跟 JavaScript 兩個版本，甚至還附了三個 game for JavaScript。
+    
+[ ] 04:17 2026/11/04 我現在對 Project K 感覺下一個努力的方向應該是 2.1.0，目前的是 2.0.0（我指的是打 tag）。
+	2.1.0 的目標是什麼呢？就是 Project K 再加上 AI，就這樣子，所以規格書要寫好。
+	- 目前的 Project K 再加上 demo 是蠻好玩的，但是東西又有點多，怕又犯了跟以前的 peforth v1 同樣的毛病。
+	[ ] 04:36 2026/11/04 py 版本加上 ai.py, .env.example, .env, .gitignore, demo.py, and words
+	    (ai) and ai: 到此為止。
+		--
+		(AGY Argon) 你來了解一下 Project K 的 Python 版本. 同時再了解一下 peforth (C:\Users\hcche\OneDrive\Documents\GitHub\peforth)
+		我的目的就是要給 Project K 加上 repl.py (也就是 UI) with 這兩個 words: (ai) and ai:
+		這兩個 words 的定義可以參考 peforth.
+		Tell me about your understanding.
+		--
+		05:00 2026/11/04
+		AGY:
+		  我已經讀完 Project K 的 Python 版（py/ 與 project-k-conceptual-spec.md）、開發日誌（project-k-devlog.txt），以及 peforth（含目前 peforth 主線與先前 v2-
+		  migration 分支的演進）。以下整理我的理解：
+		  ──────
+		  ### 1. Project K Python 版目前的定位與架構 (v2.0.0)
+		  • **極簡核心 projectk.py**：
+			  • 完全依照 Conceptual Spec 實作，只依賴 Python 標準庫。
+			  • 初始 VM 只有兩個 seed words：code 與 end-code。
+			  • 核心機制是以 Python Generator 實作合作式多工（Cooperative Continuation）：VM.evaluate()（outer interpreter）與 VM.call()（inner interpreter）都是
+			  generator，由 Task.resume() 驅動；當 word 執行 yield vm.pause() 時，Task 狀態變為 "paused" 並把控制權交回 Host（UI/REPL），保留完整的 call
+			  frames、input 游標（Input.tib / Input.itib）、rstack 與 tstack。
+		  • **實驗室與示範詞彙 demo.py**：
+			  • 內含 EXPLORER 示範詞彙（:、;、immediate、dup、over、swap、drop、+、*、.、pause、resume、.s、words、see、bye、s"、help）與單元測試
+			  ConceptualContract，以及一個極簡的 k>  repl()。
+		  • 與 peforth/projectk.py 的 API 名稱差異：
+			  • Project K v2 正名後的介面使用：KernelError（而非 ForthError）、vm.dstack（而非 vm.stack）、vm.latest（而非 vm.last()）、VM.host_boundary()（而非
+			  vm._find_code_terminator()）、vm._discard()（而非 vm._discard_definition()）。
+
+		  ──────
+		  ### 2. peforth 中 (ai)、ai: 與 repl.py 的運作機制
+		  在 peforth（ai.f、ai_bridge.py、repl.py）中，AI 整合的核心設計正是為了展示 Project K 的 Pause / Resume + Host Interop：
+		  1. (ai) — ( prompt-string stream? -- [response-string] )
+			  • 是一個 generator 型態的 code word。
+			  • 從 vm.dstack 取出 stream_response（Boolean）與 prompt（String）。
+			  • 透過 OpenAI Agents API（/v1/agents/sessions 與 /sessions/{id}/events SSE 串流）建立或延續 vm.host["ai_active_session_id"]。
+			  • 提供給 AI 兩個最核心的 Function Tools：
+				  • projectk_search_words（搜尋字典）：直接查詢 vm.words 的名稱、source、help/comment，不需使用者審核即可回傳給 AI。
+				  • projectk_run_forth（提議在本地 VM 執行 Forth 程式）：
+					  • 當 AI 呼叫此 tool 時，若尚未開啟 ai_trusted，(ai) 會將提議 {action, source, purpose} 寫入 vm.host["ai_pending_approval"]，然後執行 yield
+					  vm.pause() 暫停當前 Task，把控制權交回 repl.py！
+					  • 待 repl.py 詢問使用者並將決定放入 vm.host["ai_approval_result"]、呼叫 task.resume() 後，(ai) 從暫停處繼續執行：若核准，就在本地 vm
+					  執行該段 Forth 程式碼（擷取 stdout、stderr、dstack 快照與狀態），再把結果透過 agent.session.input.tool_result 送回給 AI 繼續完成該回合。
+
+			  • 輸出處理：若 stream_response == True，收到 output_text.delta 時即時印出到終端機；若 stream_response == False，則將完整回覆字串 push 回 vm.dstack。
+		  2. ai: — ( <prompt> -- ) (immediate)
+			  • 讀取當前輸入緩衝區（TIB）剩餘的文字作為 prompt，搭配 True（串流印出模式）呼叫 (ai)。
+			  • 在 peforth 中定義為 colon word（例如 : ai: s" " word true (ai) ; immediate，或在 Project K 中讀取 vm.input.rest() 再串接 yield from vm.
+			  call("(ai)") / colon word）。
+		  3. repl.py（UI / Host 調度層）
+			  • 負責建立並載入 VM 詞彙，提供互動式命令列介面（支援多行 code ... end-code 輸入、或是 forth> / chat> 模式切換）。
+			  • 最關鍵的 UI 職責：當 task = vm.dictate(line) 回傳 task.status == "paused" 且發現 vm.host.get("ai_pending_approval") 時，由 REPL 接手顯示 AI 提議的
+			  Forth 程式碼與目的（Purpose / Source），讓使用者選擇（例如 Trust / Yes / No / Cancel），設定 vm.host["ai_approval_result"] 後呼叫 task.resume()（或
+			  task.cancel()），完美示範 Project K kernel 為何需要 Task 與 pause/resume。
+
+		  ──────
+		  ### 3. 對您這次目標的理解（Project K 保持精簡、點到為止）
+		  從您的提示與 docs/project-k-devlog.txt 的紀錄來看：
+
+		  • peforth 後期加上了非常多應用層功能（SQLite session mirror、diagnostics log、Herdr computer use、桌面截圖、Nokia 音效、眾多 ai-* 管理指令等）。
+		  • 但 Project K 的重點是精簡與概念展示：
+			  • projectk.py 本身維持純淨不變。
+			  • 在 py/ 下加上輕量的 AI 支援模組（例如 ai.py）、設定檔範本（.env.example、.gitignore）與 UI 介面 repl.py。
+			  • 在 Forth 詞彙上只加 (ai) 與 ai: 這兩個 words 到此為止，不把 peforth 那些繁複的週邊搬進來，避免重蹈 peforth v1 過度膨脹的覆轍。
+
+
+		  請問這樣的理解是否完全符合您的想法？如果方向正確，我們接下來可以先討論或確認：
+
+		  1. repl.py 的 UI 想要維持像 demo.py 一樣零第三方依賴（標準庫 input()），還是要像 peforth 一樣使用 prompt_toolkit（或有安裝就用、沒安裝 fallback 到
+		  input()）？  hc: 零第三方依賴（標準庫 input()）, repl.py 改名叫 main.py 好了
+		  2. repl.py 是否也要支援 forth> / chat> 兩種模式切換，還是單純的 k> / forth> 搭配 ai: 即可？ hc: 單純的 forth> 搭配 ai: 即可
+		  3. hc: main.py 只知道 projectk.py, 啟動以後 include projectk.f, 由 projectk.f 把兩個 AI words 定義起來，到此為止。
+  
+		--
+		05:35 2026/11/04 AGY:
+		在 Project K 的 Conceptual Spec 中，每個 Word 本來就擁有 properties: dict（以及 extension 屬性）。
+		與其在 Python / Host 寫死複雜的字串正規表示式或特例判斷，不如把控制權交給 Forth 字典本身，由 Word 自身的 property 來宣告或決定安全屬性。
+		我們可以在此基礎上進一步討論具體的機制，主要有以下幾種設計面向與您探討：
+		  ──────
+		  ### 1. 審核檢查的時機點
+
+		  • 方式一：靜態 Token 掃描（AI 提議代碼時檢查） hc: 這個做法我覺得可能做不到。因為 forth word 裡面又去 call 別的 forth words，如果只有表面 safe、裡面卻不 safe 的話，該怎麼辦？
+			  • 當 AI 發起 projectk_run_forth（例如提議執行 12 square . 或 words）：
+			  • 核心/AI 模組先快速掃描這段 source 裡的 tokens。
+			  • 如果裡面的 words 都有 word.properties.get("safe", False)（或是白名單純計算/純檢視詞彙），就直接執行，完全不打擾使用者！
+			  • 如果出現沒有標記 safe（或標記了 need_confirm=True / 含有未知詞彙），才觸發審核流程。
+		  • 方式二：執行期（Runtime）攔截
+			  • 也可以是在執行期間，如果有特定敏感操作的 word 被叫到，由該 word 自己檢查或觸發暫停。不過由於 Forth
+			  代碼可能在執行中途產生副作用，通常在提議時預先審查會更安全。 hc: 我覺得只有這個做法才可行
+		  ──────
+		  ### 2. Forth 語法如何標記 Property？
+
+		  在 Forth 裡，我們可以用很精簡直觀的語法為 word 上標籤，例如：
+			\ 方式 A：定義一個輔助詞或語法來設定屬性  hc: 這個做法最自然. 檢查這個 flag 是誰？ vm.call() 嗎? 有沒有一個關卡，是所有的來源都會用到的關卡？
+			' .s :: safe=true
+			' words :: safe=true
+			' + :: safe=true
+
+			\ 方式 B：用專屬 word 標記
+			' words is-safe
+			' see is-safe
+		  這樣一來：
+		  • 像 .、.s、words、see、dup、swap、+、* 等純粹輔助與計算的詞彙，可以在 projectk.f 裡直接標記為安全。
+		  • AI 在幫使用者查字典、算數學、檢查 stack 時，流暢無阻，不需每步都向使用者要確認。
+		  • 一旦 AI 想要定義新詞、修改狀態、呼叫 Python 系統功能時，因為該詞不是 safe，就會觸發審核。
+		  ──────
+		  ### 3. 當「需要審核」時，UI 與 Task 如何互動？
+		  因為 main.py 是純 Python 標準庫（使用標準 input()）：
+
+		  1. 當需要審核時，(ai) 印出 AI 的目的（Purpose）與程式碼（Source），並執行 yield vm.pause()。
+		  2. Task 狀態變為 paused，控制權退回到 main.py 的 forth> 提示字元。
+		  3. 此時使用者有兩種最自然的操作方式：
+			  • 選項 A（交談式提示）：
+			  REPL 偵測到有 pending 的 AI 任務，直接以 input("Run it? (y/n): ") 詢問使用者；使用者按 y 則自動 task.resume()，按 n 則拒絕並 resume 告知 AI。
+			  • 選項 B（純 Forth 風格）：  hc: 我們應該是最精簡的，就用這個風格
+			  REPL 直接回到 forth>。使用者看到 AI 提議後，可以直接在 forth> 檢查當前 stack 或狀態；滿意的話輸入 resume（或按 Enter）繼續執行，不想跑就輸入 cancel
+			  或做其他事。
+
+		  ──────
+		  您對 「Property 的標記規則（白名單 safe 還是黑名單 need_confirm）」 以及 「需要審核時的互動方式」，有哪種更符合您心目中的體驗呢？
+		--
+		  這兩個考量切中要害，而且方向非常清晰！
+
+		  針對您的提問：
+
+		  │ 「檢查這個 flag 是誰？ vm.call() 嗎？有沒有一個關卡，是所有的來源都會用到的關卡？」
+
+		  讓我們從 Project K 的核心調度路徑來檢視：
+		  ──────
+		  ### 1. 核心關卡在哪裡？答案正是：vm.call()
+
+		  在 projectk.py 中，所有 word 的執行最終且必定通過 **vm.call(operation)**：
+
+		  1. Outer Interpreter（vm.evaluate()）：
+			  • 解析 TIB 得到 token，查找到 word 後：yield from self.call(word)
+		  2. Inner Interpreter（vm.call()` 執行 colon definition 迴圈）：
+			  • 當 colon word 執行時，遍歷它的 operations，每一個子步驟：yield from self.call(step)
+		  3. 直接執行（vm.execute()）：
+			  • vm.execute(operation) 也是包裝 self.call(operation)。
+		  👉 也就是說：vm.call() 是整個系統唯一的咽喉要道！
+		  無論是外層直接下的指令，或是 colon word 內部一層一層深層呼叫的子 words，每一個 word 進入執行前都會經過 vm.call()。
+		  ──────
+		  ### 2. 但是：projectk.py 是核心 SPEC，要不要改它？
+
+		  這裡有兩個絕妙的切入點供您選擇：
+
+		  #### 方案 A：在 projectk.f / ai.py 中「攔截/包裹」vm.call（不修改 projectk.py，保持 kernel 100% 原始） hc: 這是不是一個 decorator？ 用 decorator 好像也蠻漂亮的。
+
+		  因為 Python 的 method 可以動態綁定或 hook，我們可以在載入 AI 模組時，把 vm.call 包裝一層：
+
+			original_call = vm.call
+			def security_aware_call(operation):
+				# 檢查是否在 AI 執行情境中（例如 vm.host.get("in_ai_eval")）
+				# 如果 operation 是 Word 且有審核 flag，在此處 yield vm.pause()
+				...
+				yield from original_call(operation)
+			vm.call = security_aware_call
+
+		  這樣 projectk.py 完全維持原貌、一行都不必改，依然是純淨的 Conceptual Spec 實作！ 
+
+		  #### 方案 B：在提議階段，遞迴走訪 Colon Word 的 action 元組做安全分析  hc: 看不出好處，這個好像多此一舉
+
+		  如果是在 AI 提議代碼時預先審查：
+
+		  • 對於 token 直接查到的 Word：
+			  • 若是 code word：直接檢查其 property。
+			  • 若是 colon word：它的 word.action 是一個 tuple，裡面包含了所有編譯進去的子 words！我們可以很簡單地遞迴展開檢查裡面的所有子 words 是否都有 safe
+			  flag。
+		  • 但如果遇到動態執行的詞（如 execute），靜態展開就無法穿透，這時方案 A（Runtime 關卡）依然是最滴水不漏的。
+		  ──────
+		  ### 3. 選項 B（純 Forth 風格的 REPL 流程）串接起來的模樣
+		  當審核 flag 被觸發需要使用者確認時：
+
+		  1. 終端機印出提示，例如：
+			AI request confirmation for word: [write-file] (or proposed program)
+			Task: paused. Type 'resume' to proceed, or inspect stack/cancel.
+			forth>
+
+		  2. 控制權回到純精簡的 forth> 提示字元。
+		  3. 使用者就是主宰：
+			  • 可以下 .s 看看目前的 stack。
+			  • 可以下 see write-file 查看這個詞在幹嘛。
+			  • 覺得沒問題，直接下 resume，剛才暫停的 Task 就從該 word 繼續跑！
+			  • 覺得有問題，下 abort 或不做處理。
+
+
+		  這完全符合 Project K 原生的 Task 與 pause/resume 哲學，完全不需要額外的 UI 對話框或第三方庫！
+		  ──────
+		  您覺得在不修改 projectk.py、由 ai.py / projectk.f 掛上這個執行關卡的做法，是否符合您的期待？若是，
+		  屬性名稱您喜歡用什麼（例如 word.properties["safe"] hc: 我選這個
+		  還是 word.properties["need_confirm"]）？
+		--
+		AGY 06:09 2026/11/04
+		> 可不可以針對 task 批准？先写成 SPEC. 放在 c:\Users\hcche\OneDrive\Documents\GitHub\project-k\py\docs\ , filename 你幫我想一下
+
+		  這個想法非常關鍵！
+
+		  如果只能針對單個 word 批准，當 AI 提出一段包含多個不安全 word 的程式碼時，使用者可能要在 forth> 裡一直 resume、resume 好幾次，體驗會變得很瑣碎。
+		  如果支援**「針對 Task 批准」（Task-Level Approval / Trust）**：
+
+		  • 當一個 AI Task 被使用者批准（例如以 Task 為範疇信任它，或使用者下達特定指令放行這個 Task）時，該 Task 在其生命週期內後續遇到的 word
+		  就不再中斷暫停，直到該 Task 完成為止。
+		  • 一旦 Task 結束（done / aborted / failed），這個批准就自動過期，完全不留全域後遺症。
+		  • 同時，如果使用者只想「逐詞確認（Step-by-step）」或「批准這一次 Task（Trust this task）」，都可以靈活切換。
+		  這正是 Project K Conceptual Spec 中 「State has an owner: Task owns its lifecycle & private context」 的最佳詮釋！
+		  ──────
+		  ### 文件檔名建議
+
+		  建議檔名：
+		  c:\Users\hcche\OneDrive\Documents\GitHub\project-k\py\docs\task-security-spec.md
+		  （或者 ai-task-approval-spec.md）
+
+		  我來幫您撰寫這份詳細的 SPEC，定義清楚：
+		  1. 背景與目標（從 Word 屬性到 Task 範疇批准）。
+		  2. Word 屬性 safe 的定義。
+		  3. vm.call Decorator 攔截機制。
+		  4. Task-Level 批准狀態（Task Approval Scope）。
+		  5. 在純 Forth 風格 REPL 下的互動行為（Pause / Resume / Cancel）。
+		  我現在就為您建立這份規格文件。
+
+		● Edited 1 file (task-security-spec.md) (ctrl+o to expand)
+
+		  已為您完成規格書的撰寫，並放置於：
+		  **`py/docs/task-security-spec.md`**
+		  ──────
+		  ### 規格書核心重點摘要：
+
+		  1. Word 屬性安全標記 (word.properties["safe"])：
+			  • 白名單機制：純讀取、純計算、字典查詢等無副作用詞彙（如 dup、+、.s、words、see 等）標記為 safe=True。
+			  • 任何可能修改狀態、檔案操作、定義新詞彙的詞彙預設需審核。
+		  2. 唯一咽喉關卡：vm.call Decorator：
+			  • 保持 projectk.py 100% 原始不變。
+			  • 透過 Decorator 攔截 AI 執行脈絡下的每一個 word 呼叫，不論是 Outer Interpreter 還是 Colon Word 內部展開的深層呼叫。
+		  3. 針對 Task 的批准（Task-Level Approval）：
+			  • Step-by-step（單步放行）：直接在 forth> 下輸入 resume，僅放行當前這個 word。
+			  • Trust Task（批准整個 Task）：在 forth> 下輸入 trust-task resume，將當前 pending 的 AI Task 標記為信任，後續所有操作一路暢通放行，直到該 Task
+			  完成為止（任務結束後信任自動失效，不留全域後遺症）。
+			  • Reject / Cancel：在 forth> 下取消該任務。
+		  4. 純 Forth 風格的極簡互動：
+			  • 不引入第三方 UI 庫，完全依靠 Task 的 yield vm.pause() 退回 forth>，讓使用者擁有最高掌控權。
+
+		  請您過目這份規格書，看看內容與流程是否完全符合您的設想！
+
+		────────────────────────────────────────────────────────────
+		> 還有另外一份整個 AI supporting 的 conceptual 規格書
+
+		  太棒了！這正是 Project K 2.1.0 最核心的基石。
+		  如同您在 docs/project-k-devlog.txt 中寫下的願景：
+		  │ 「2.1.0 的目標是什麼呢？就是 Project K 再加上 AI，就這樣子，所以規格書要寫好。」
+		  │ 「目前的 Project K 再加上 demo 是蠻好玩的，但是東西又有點多，怕又犯了跟以前的 peforth v1 同樣的毛病。py 版本加上 ai.py, .env.example, .env, .gitignore,
+		  │ demo.py, and words (ai) and ai: 到此為止。」
+		  現在我們有了針對安全審核的詳細規範（task-security-spec.md），接下來需要一份宏觀、語言中立（Conceptual）且定義清晰的 「AI Supporting Conceptual
+		  Specification」。
+		  ──────
+		  ### 規格書檔案規劃
+		  這份概念規格書應當與原本的 project-k-conceptual-spec.md 互相呼應。
+		  建議放置於：
+		  c:\Users\hcche\OneDrive\Documents\GitHub\project-k\docs\project-k-ai-conceptual-spec.md
+		  （並在 py/docs/ 下保留鏡像或連結，供 Python 版開發者查閱）。
+		  它涵蓋的核心概念：
+
+		  1. 設計哲學 (Philosophy & Boundary)：
+			  • Kernel 內部維持「零 AI」，AI 是 Host Extension；
+			  • 點到為止，僅支援 (ai) 與 ai:，拒絕非核心週邊的無限膨脹。
+		  2. 通訊模型與生命週期 (Communication & Lifecycle Model)：
+			  • 基於 Session 與 Turn 的對話模型。
+			  • 串流輸出（Streaming）與非串流（String Return）的雙模支援。
+		  3. Task 合作式暫停與雙向驅動 (Cooperative Suspend/Resume Architecture)：
+			  • 闡述為何 Project K 的 Task、Continuation、Pause/Resume 是 AI 整合的天作之合。
+			  • AI 與 Host / Forth VM 雙向調度模型（AI 提議程式碼 -> Kernel 執行 -> 結果回傳 AI）。
+		  4. 工具呼叫抽象 (Tool Abstraction)：
+			  • 字典檢索 (search_words) 與 代碼執行 (run_forth)。
+		  5. 安全與權限邊界 (Safety & Authority Boundary)：
+			  • 自宣告安全屬性（Word Property safe）。
+			  • Task 範疇批准（Task-level Trust）。
+		  6. 驗收情境 (Acceptance Scenarios)。
+		  我現在就為您撰寫這份規格書！
+		● Edited 1 file (project-k-ai-conceptual-spec.md) (ctrl+o to expand)
+
+		  已為您建立這份宏觀且結構完整的 AI Supporting Conceptual Specification：
+		  📄 **`docs/project-k-ai-conceptual-spec.md`**
+		  ──────
+		  ### 本規格書的核心體系架構：
+
+		  1. 宗旨與邊界 (Boundary)：
+			  • 確核 Kernel 內部維持零 AI，AI 純粹作為 Host 擴充。
+			  • 堅守 極簡克制，點到為止 的原則，全系統只對外暴露 (ai) 與 ai: 兩個 Forth 詞彙，絕不蔓生非必要的邊緣功能。
+		  2. 對話模型 (Conversation Model)：
+			  • 定義 Session 與 Turn 生命週期。
+			  • (ai) 支援 stream? = true（串流印出）與 stream? = false（字串回傳至 Data Stack）的雙模語意。
+			  • ai: 作為 Immediate Word，讀取剩餘 TIB 轉發給 (ai)。
+		  3. Task 合作式暫停與雙向調度 (Cooperative Suspend/Resume Architecture)：
+			  • 詳述 Project K 的 Task、Continuation、Pause/Resume 如何與 AI 的延遲等待、授權中斷完美結合。
+		  4. 工具呼叫抽象 (Tools)：
+			  • projectk_search_words（字典檢索，純讀取直接放行）。
+			  • projectk_run_forth（代碼執行，受安全審核守護）。
+		  5. 安全與權限邊界 (Safety & Authority)：
+			  • Word 自宣告屬性（word.properties["safe"] 白名單）。
+			  • vm.call Decorator 統一關卡。
+			  • Task 範疇批准（Task-Level Approval）：以 Task 為生命週期隔離信任狀態，結束即刻銷毀。
+		  6. 行為驗收情境 (Acceptance Scenarios)。
+
+		  這兩份規格書：
+
+		  • 宏觀概念規格：**`docs/project-k-ai-conceptual-spec.md`**
+		  • 具體安全審核規格：**`py/docs/task-security-spec.md`**
+
+		  已經完整奠定了 Project K 2.1.0 的理念與實作藍圖。請您檢視內容，若有任何想要調整或增修的細節，我們隨時調整！		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+[ ]
+[ ]
+[ ]
+[ ]
+[ ]
+[ ]
+[ ]
+[X]
+
+🦞（龍蝦） 📖 NotebookLM ⚛️ OpenAI ✨ Gemini
+🌞 🌈 💡 Bulb ❌ Canceled 🎉 Party 🤗 Hugging Face ⚠️ Warning ✅ Checked 🌟 Stars
+🦀（螃蟹）💫 🪐 🌠
+
+	
