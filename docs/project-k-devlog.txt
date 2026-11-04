@@ -435,10 +435,10 @@
     11:07 2026-10-18 v2 已經都搞定，而且上線了。
     有 Python 跟 JavaScript 兩個版本，甚至還附了三個 game for JavaScript。
     
-[ ] 04:17 2026/11/04 我現在對 Project K 感覺下一個努力的方向應該是 2.1.0，目前的是 2.0.0（我指的是打 tag）。
+[X] 04:17 2026/11/04 我現在對 Project K 感覺下一個努力的方向應該是 2.1.0，目前的是 2.0.0（我指的是打 tag）。
 	2.1.0 的目標是什麼呢？就是 Project K 再加上 AI，就這樣子，所以規格書要寫好。
 	- 目前的 Project K 再加上 demo 是蠻好玩的，但是東西又有點多，怕又犯了跟以前的 peforth v1 同樣的毛病。
-	[ ] 04:36 2026/11/04 py 版本加上 ai.py, .env.example, .env, .gitignore, demo.py, and words
+	[X] 04:36 2026/11/04 py 版本加上 ai.py, .env.example, .env, .gitignore, main.py, and words
 	    (ai) and ai: 到此為止。
 		--
 		(AGY Argon) 你來了解一下 Project K 的 Python 版本. 同時再了解一下 peforth (C:\Users\hcche\OneDrive\Documents\GitHub\peforth)
@@ -744,9 +744,161 @@
 		  • 具體安全審核規格：**`py/docs/task-security-spec.md`**
 
 		  已經完整奠定了 Project K 2.1.0 的理念與實作藍圖。請您檢視內容，若有任何想要調整或增修的細節，我們隨時調整！		
-		
-		
-		
+    --
+[ ] 11:03 2026-11-04
+    repo: c:\Users\8304018\OneDrive\Documents\GitHub\project-k
+    read spec:
+
+        docs\project-k-ai-conceptual-spec.md
+        docs\task-security-spec.md
+
+    想像中的執行方式是這樣子:
+
+        python -i main.py
+
+    main.py 裡面的工作
+
+        1. get VM from projectk.py
+        2. vm = VM(...)
+        3. vm.dictate(base.f) \ 定義出 (ai) 所需要的基本 words
+        4. vm.dictate(ai.f)   \ 定義出 (ai) and ai:
+        5. vm.dictate(repl.f) \ User interface
+    
+    --
+    AGY Gemini 3.8 Flash (Medium) 13:27 2026-11-04
+
+      已研讀以下兩份規格文件與相關核心原始碼：
+
+      1. **`docs/project-k-ai-conceptual-spec.md`**（AI 概念規格與雙向調度合約）
+      2. **`py/docs/task-security-spec.md`**（Task 安全審核與 vm.call Decorator 機制）
+      3. **`py/projectk.py`**（Project K 核心 VM 與 Task）
+      ──────
+      ### 架構評估：五步驟啟動設計
+
+      您構想的啟動方式：
+
+        python -i main.py
+
+      搭配 main.py 的五步啟動序列，非常乾淨且完全符合 Forth 經典的自舉（bootstrap）哲學：
+        main.py
+          ├── 1. from projectk import VM
+          ├── 2. vm = VM(...)
+          ├── 3. vm.dictate(base.f)   --> 建立 Forth 核心基礎詞彙與 safe 屬性標記語法
+          ├── 4. vm.dictate(ai.f)     --> 掛載 vm.call 安全關卡、定義 (ai) 與 ai:
+          └── 5. vm.dictate(repl.f)   --> 啟動 Forth 互動介面 (forth> 提示字元)
+
+      當在 REPL 中輸入 bye 退出時，因使用 python -i，會無縫退回 Python 互動環境（>>>），全域變數 vm
+      仍完好保留供檢查，開發與除錯體驗極佳。
+      ──────
+      ### 各檔案的職責劃分
+
+      #### 1. main.py (宿主入口)
+
+      • 從 projectk.py 引入 VM。
+      • 讀取並依序 vm.dictate() 執行 base.f、ai.f、repl.f。
+      • 純 Python 標準庫，維持極簡。
+      #### 2. base.f (基礎詞彙與安全性標籤)
+
+      • 從僅有 code / end-code 的初始狀態自舉：
+          • :、;、immediate、註解（\、(、//、///）
+          • 基礎堆疊：dup、drop、swap、over、rot、pick、roll
+          • 基礎運算：+、-、*、/、比較運算
+          • 基礎 I/O：s"、.、.s、cr、words、see
+          • Task 調度：pause、resume、abort、bye
+      • 安全屬性標記：
+          • 提供 ' word :: safe=True 語法。
+          • 將無副作用的純計算與檢視詞彙標註為 safe=True。
+
+
+      #### 3. ai.f (AI 擴充與安全防護關卡)
+
+      • 安全 Decorator：
+          • 攔截 vm.call，在 AI 任務執行時檢查 word.properties.get("safe")。
+          • 若非 safe 且該 Task 未獲信任，印出警告並 yield vm.pause()。
+      • Task 批准指令：
+          • 定義 trust-task 與 cancel-task。
+      • 核心 AI 詞彙（點到為止）：
+          • (ai)：( prompt-string stream? -- [response-string] )（Host Code 協程，純標準庫 HTTP 通訊，支援
+          projectk_search_words 與 projectk_run_forth 工具）。
+          • ai:：( <prompt> -- )（Immediate Word，截取剩餘 TIB 呼叫 true (ai)）。
+
+
+      #### 4. repl.f (互動介面)
+
+      • 定義並啟動 forth> 提示字元迴圈。
+      • 監聽任務狀態：當 AI Task 觸發安全審核暫停時，提示使用者可輸入 resume、trust-task resume
+      或檢視狀態。
+      ──────
+      請問是否照此架構開始為您實作這四個檔案（main.py、base.f、ai.f、repl.f）？
+    --
+    AGY Gemini 3.8 Flash (Medium) 13:35 2026-11-04
+      已完成實作並通過所有安全驗收測試。
+      ### 檔案清單與實作成果
+      1. **`py/main.py`**：
+      依序完成五步驟自舉（bootstrap）：
+        # 1. get VM from projectk.py
+        # 2. vm = VM(...)
+        vm = VM()
+        vm.host["__file__dir__"] = str(HERE)
+
+        # 3. vm.dictate(base.f) \ 定義出 (ai) 所需要的基本 words
+        dictate_file(vm, "base.f")
+
+        # 4. vm.dictate(ai.f)   \ 定義出 (ai) and ai:
+        dictate_file(vm, "ai.f")
+
+        # 5. vm.dictate(repl.f) \ User interface
+        dictate_file(vm, "repl.f")
+
+      2. **`py/base.f`**：
+          • 從僅有 code / end-code 開始自舉：immediate、\、:、;、註解（(、//、///）。
+          • 基礎運算與堆疊：dup、drop、swap、over、rot、pick、roll、depth、+、-、*、/、mod、比較與布林等。
+          • 字典與檢視：.、.s、words、see、s"、."、help。
+          • 調度：pause、resume、abort、bye。
+          • 屬性標記：' word :: safe=True 與 safe: word，並將純計算與讀取詞彙標註為 safe=True。
+          • 將除錯與控制詞彙（.s、words、see、resume、bye 等）設為
+          immediate，確保在編譯中途暫停時仍能即時執行。
+      3. **`py/ai.f`**：
+          • 掛載 AI 安全關卡。
+          • 定義審核控制指令：trust-task（授權當前 Task 在其生命週期內直接執行）與 cancel-
+          task（取消該任務）。
+          • 定義核心詞彙：
+              • (ai)：( prompt stream? -- [response] )
+              • ai:：( <prompt> -- )（Immediate，截取剩餘 TIB 呼叫 true (ai)）。
+
+      4. **`py/ai.py`**：
+          • vm.call 安全 Decorator：在 AI 執行脈絡下遇到非 safe 詞彙時主動 yield vm.
+          pause()，支援單步放行與 Task-level 批准。
+          • 工具實作：projectk_search_words（字典搜尋，安全放行）與
+          projectk_run_forth（代碼執行，受安全審核守護）。
+          • 純標準庫（urllib）SSE 串流對話生成器與 .env 載入器。
+      5. **`py/repl.f`**：
+          • 提供 forth> 互動介面，支援中斷提示、單步 resume 與 trust-task resume。
+      6. **`py/.env.example`** 與 **`.gitignore`**：
+          • 設定檔範本與忽略檔。
+
+      ──────
+      ### 執行與測試驗證
+
+      在 py 目錄下執行：
+
+        python -i main.py
+
+      即直接進入 Forth 提示字元：
+
+        Project K Forth 2.1.0 (with AI support)
+        Type 'help' for instructions, 'ai: <prompt>' for AI assistance, 'bye' to exit.
+        forth> 3 4 + .
+        7
+        forth> ai: 你好
+        [AI] OPENAI_API_KEY is not set.
+        ...
+        forth> bye
+        >>> vm
+        <projectk.VM object at ...>
+
+      四大安全情境驗收測試（Safe 直通、非 safe 詞彙單步審核、trust-task resume 任務信任、cancel-task
+      取消）已全數通過。    
 		
 		
 		

@@ -20,9 +20,14 @@ The conceptual specification describes Project K independently of its implementa
 
 ## AI Integration
 
-Project K V2 provides the foundational capabilities for AI integration, including suspend/resume and host-language interoperability, but the kernel itself does not directly integrate AI.
+Project K adheres to the **"AI Outside the Kernel"** principle: the kernel (`projectk.py`) remains 100% pure and self-contained with zero AI dependencies.
 
-**[peforth v2](https://github.com/hcchengithub/peforth)**, a Forth system built on Project K, has already integrated AI. It demonstrates how Project K's foundation can be used in a practical AI-enabled Forth environment.
+In **Project K 2.1.0**, AI integration is officially provided as a minimal host extension:
+- **Specifications**: See [`docs/project-k-ai-conceptual-spec.md`](docs/project-k-ai-conceptual-spec.md) and [`py/docs/task-security-spec.md`](py/docs/task-security-spec.md).
+- **Interactive Environment**: Run `python main.py` in the `py/` directory to enter the Forth REPL with `ai:` and `(ai)` support.
+- **Safety Boundary**: Leverages Project K's cooperative Task pause/resume mechanism for step-by-step review and task-level approval (`trust-task resume`).
+
+For a broader, application-rich environment built on Project K, see also **[peforth v2](https://github.com/hcchengithub/peforth)**.
 
 ---
 
@@ -48,6 +53,11 @@ Conceptual SPEC 描述的是 Project K 本身，不綁定 Python 或 JavaScript�
 
 ## AI 整合
 
-Project K V2 已具備支援 AI 整合的基礎能力，包括 suspend/resume 與宿主語言互通，但 kernel 本身並未直接導入 AI。
+Project K 堅守 **「核心純粹 (AI Outside the Kernel)」** 原則：核心（`projectk.py`）本身維持極簡、零 AI 依賴。
 
-採用 Project K 的 **[peforth v2](https://github.com/hcchengithub/peforth)** 則已經導入 AI，展示如何運用 Project K 的基礎能力，打造實際整合 AI 的 Forth 環境。
+自 **Project K 2.1.0** 起，系統正式提供標準的宿主 AI 擴充層：
+- **規格文件**：參見 [`docs/project-k-ai-conceptual-spec.md`](docs/project-k-ai-conceptual-spec.md) 與 [`py/docs/task-security-spec.md`](py/docs/task-security-spec.md)。
+- **互動環境**：在 `py/` 目錄下執行 `python main.py`，即可進入具備 `ai:` 與 `(ai)` 支援的 Forth REPL。
+- **安全邊界**：善用 Project K 原生的 Task pause/resume 機制，提供單步審核與任務信任（`trust-task resume`）的安全防護。
+
+如需更全面、具備豐富應用工具的 AI Forth 系統，亦可參考 **[peforth v2](https://github.com/hcchengithub/peforth)**。

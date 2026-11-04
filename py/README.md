@@ -1168,3 +1168,36 @@ call asynchronous; the integration must arrange for the wait to yield control.
 Words provide capabilities, Frames record word-invocation progress, and Tasks
 retain the execution path across a pause. This is the foundation prepared for
 AI; the AI itself is deliberately not present here.
+
+## Project K 2.1.0: AI Host Integration in Action
+
+In Project K 2.1.0, the preparation described above became reality. While `projectk.py` remains 100% pure and untouched, the Python environment now provides a complete AI host extension driven directly from Forth:
+
+```bash
+python main.py
+```
+
+### How it boots
+1. `main.py` constructs a bare `VM` and dictates `base.f`.
+2. `base.f` bootstraps the basic Forth vocabulary, then loads `ai.f` and `repl.f`.
+3. `repl.f` enters the interactive `forth>` console.
+
+### Core AI words
+- **`(ai)`** `( prompt-string stream? -- [response-string] )`  
+  Cooperative AI turn generator. Streams responses when `stream?` is true, or pushes the full response string onto the stack when false.
+- **`ai:`** `( <prompt> -- )` (immediate)  
+  Command-line entry point that consumes the remaining input buffer and sends it as a streaming prompt.
+
+### Two-way dispatch and Task security
+The AI assistant can inspect the dictionary (`projectk_search_words`) and propose Forth execution (`projectk_run_forth`). To prevent unauthorized side effects:
+- Safe words (calculations, stack manipulation, read-only inspection) execute immediately.
+- If the AI proposes non-safe words, the Task pauses cooperatively:
+  ```text
+  [Security] Word ':' is not marked as safe.
+  Task paused for review. Type 'resume' for single step, 'trust-task resume' to trust this task.
+  forth> 
+  ```
+- Users can review the stack (`.s`) and choose single-step execution (`resume`) or grant lifetime task trust (`trust-task resume`).
+
+See [`docs/project-k-ai-conceptual-spec.md`](../docs/project-k-ai-conceptual-spec.md) and [`docs/task-security-spec.md`](docs/task-security-spec.md) for full specifications.
+
